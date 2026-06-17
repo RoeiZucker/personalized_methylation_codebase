@@ -31,7 +31,7 @@ from config_manager import (CREATE_PROJECT_TASK_NUM,
 
 import os
 
-SCRIPTS_DIR = "/home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts"
+SCRIPTS_DIR = "/home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/scripts"
 IS_PRODUCTION = True
 IS_FOR_SCRIPT = False
 # print(os.run())
@@ -50,7 +50,7 @@ else:
 
 COMMAND_PREFIX = "sbatch --container-mounts=/shared:/shared --partition=compute-gpu --qos=owner_95 --gres=gpu:1 --time=45:10:00 --container-image=docker://nvcr.io/nvidia/pytorch:25.10-py3 "
 # usage
-path = "/home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kol_kora_configs/project_configs/_full_liver.yaml"
+path = "/home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/configs/kol_kora_configs/project_configs/_full_liver.yaml"
 
 default_learning_rates = [1e-05, 1e-06, 1e-07]
 default_batch_sizes = [2, 4]

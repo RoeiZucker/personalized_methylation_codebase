@@ -183,7 +183,6 @@ def evaluate_sample_predictions(variability_file_path,
         curr_result_eval["all_results"] = eval_object
     
         std_max = variability_file["std"].max()
-        results = []
         target = number_of_bins
         new_result_file["full_position"] = new_result_file["chrom"] + ":" + new_result_file["genomic_position"].astype(str) + "-"+ (new_result_file["genomic_position"] + 2).astype(str)
         for i in range(target):
@@ -199,11 +198,8 @@ def evaluate_sample_predictions(variability_file_path,
 def create_eval_object(new_result_file,label_a,label_b,labels):
     eval_object = {}
     eval_object[label_a + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_a]).to_dict()
-    # print(confusion_matrix)
     eval_object[label_b + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_b]).to_dict()
-    # print(confusion_matrix)
 
-    # 1. Generate the confusion matrix from your DataFrame
     types = [label_a,label_b]
     for prediciton_type in types:
         eval_object[prediciton_type] = {}

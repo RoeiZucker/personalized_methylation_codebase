@@ -213,8 +213,8 @@ BATCH_SIZE = 64
 
 
 BASE_FILE_PATH = "/shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets"
-BASE_PROJECT_CONFIG_PATH = "/home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kol_kora_no_var/project_configs/auto_created"
-BASE_CONFIG_PATH = "/home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kol_kora_no_var"
+BASE_PROJECT_CONFIG_PATH = "/home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/configs/kol_kora_no_var/project_configs/auto_created"
+BASE_CONFIG_PATH = "/home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/configs/kol_kora_no_var"
 
 # BASE_FILE_PATH = "/sci/archive/michall/roeizucker/downloaded_datasets"
 # BASE_PROJECT_CONFIG_PATH = "/cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/atlas_configs/auto_generated"

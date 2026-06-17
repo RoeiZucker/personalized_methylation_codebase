@@ -1,7 +1,7 @@
 # src/data_extractor.py
 import sys
 import os, shutil
-sys.path.insert(0, os.path.abspath("/home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/src"))
+sys.path.insert(0, os.path.abspath("/home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/src"))
 sys.path.insert(0, os.path.abspath("/cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src"))
 
 import datasets

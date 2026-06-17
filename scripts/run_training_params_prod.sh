@@ -2,7 +2,7 @@
 unset RANK LOCAL_RANK WORLD_SIZE MASTER_ADDR MASTER_PORT
 
 
-python /home/users/roeizucker/tests/jupyter_notebooks/Tom_Hope_Project/refactored_code/training_script.py  $1
+python /home/users/roeizucker/tests/new_codebase/personalized_methylation_codebase/training_script.py  $1
 
 
 # how to run:
