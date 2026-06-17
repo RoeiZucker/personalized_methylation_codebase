@@ -1,0 +1,61 @@
+params:
+  project_suffix: _Heart-Fibroblasts_window_rerun_20260517_112623
+  bigwig_files:
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652200_Heart-Fibroblasts-Z0000043R.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652201_Heart-Fibroblasts-Z0000041V.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652202_Heart-Fibroblasts-Z0000041W.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652203_Heart-Fibroblasts-Z0000041X.hg38.bigwig
+  names:
+  - Z0000043R
+  - Z0000041V
+  - Z0000041W
+  - Z0000041X
+  created_configs_path: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kol_kora_local/rerun_20260517_112623/generated/_Heart-Fibroblasts_window_rerun_20260517_112623
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  dataset_base_dir: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623
+  base_model_location: /cs/usr/roeizucker/new_storage/trained_huggingface_models_location/rerun_20260517_112623
+  model_type: regression_analysis
+  train_test_seperation: random_sample_filtration
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  use_lora: false
+  freeze_model: false
+  num_labels: 1
+  number_of_bins: 5
+  load_best_model_at_end: false
+  num_train_epoch: 5
+  num_pretrain_epoch: 2
+  per_device_train_batch_sizes:
+  - 64
+  per_device_eval_batch_size: 64
+  learning_rates:
+  - 1.0e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  number_of_steps: 10000
+  seq_sizes:
+  - 5400
+  - 1200
+  - 600
+  test_sizes:
+  - 0.2
+  save_total_limit: 2
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: false
+  use_variant_filtering: true
+  override_dataset: true
+  variant_filtering_upper_bound: 0.09
+  variant_filtering_lower_bound: 0
+  max_grad_norm: 1
+  top_rows: -1
+  load_dataset_to_memory: true

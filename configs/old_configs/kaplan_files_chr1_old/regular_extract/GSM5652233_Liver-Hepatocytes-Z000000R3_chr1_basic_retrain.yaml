@@ -1,0 +1,36 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  train_dataset_path:
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652233_Liver-Hepatocytes-Z000000R3_chr1_basic_train
+  output_dir: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652233_Liver-Hepatocytes-Z000000R3_chr1_retrain
+  trained_model_path: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652233_Liver-Hepatocytes-Z000000R3_chr1_pretrain/checkpoint-105458
+task:
+  task_type: cpg_retraining
+  analysis_name: GSM5652233_Liver-Hepatocytes-Z000000R3_chr1_retrain
+  sub_task: evaluate_multiple_checkpoints
+  sequence_col: sequence
+  label_col: labels
+  top_rows: -1
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-500m-1000g
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: true
+  freeze_mode: true
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  learning_rate: 1.0e-05
+  metric_for_best_model: mse
+  save_stratagy: epoch

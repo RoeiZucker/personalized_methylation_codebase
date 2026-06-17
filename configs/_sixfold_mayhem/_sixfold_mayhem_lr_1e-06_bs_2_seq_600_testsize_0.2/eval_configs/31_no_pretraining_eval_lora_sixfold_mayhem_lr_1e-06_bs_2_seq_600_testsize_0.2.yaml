@@ -1,0 +1,35 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  variant_file_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_sixfold_mayhem/31_per_varaint_variability_sixfold_mayhem_seq_600_datasets.csv
+  model_paths:
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixfold_mayhem/31_no_pretraining_retrain_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2/epoch-4-step-480364
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixfold_mayhem/31_no_pretraining_retrain_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2/epoch-5-step-600455
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixfold_mayhem/31_no_pretraining_retrain_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2/epoch-1-step-120091
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixfold_mayhem/31_no_pretraining_retrain_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2/epoch-3-step-360273
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixfold_mayhem/31_no_pretraining_retrain_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2/epoch-2-step-240182
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_sixfold_mayhem/31_retrain_sixfold_mayhem_seq_600_datasets_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: 31_no_pretraining_eval_lora_sixfold_mayhem_lr_1e-06_bs_2_seq_600_testsize_0.2
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 5
+  base_suffix: _sixfold_mayhem
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: true
+  freeze_mode: true
+  num_labels: 1
+  lora_over_finetuned: true

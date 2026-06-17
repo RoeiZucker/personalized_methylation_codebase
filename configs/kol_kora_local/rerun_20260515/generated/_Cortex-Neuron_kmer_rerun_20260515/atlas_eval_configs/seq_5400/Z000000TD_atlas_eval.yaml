@@ -1,0 +1,48 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  variant_file_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260515/_Cortex-Neuron_kmer_rerun_20260515/Z000000TD_per_varaint_variability_Cortex-Neuron_kmer_rerun_20260515_seq_5400_datasets.csv
+  target_bigwig_path: /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652232_Cortex-Neuron-Z000000TD.hg38.bigwig
+  atlas_bigwig_paths:
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652223_Cortex-Neuron-Z000000TF.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652225_Cortex-Neuron-Z0000042F.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652226_Cortex-Neuron-Z0000042H.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652227_Cortex-Neuron-Z0000042J.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652228_Cortex-Neuron-Z0000042M.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652229_Cortex-Neuron-Z0000042P.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652230_Cortex-Neuron-Z0000042K.hg38.bigwig
+  model_paths: []
+task:
+  task_type: cpg_evaluation
+  sub_task: atlas_evaluation
+  analysis_name: Z000000TD_atlas_eval_Cortex-Neuron_kmer_rerun_20260515_seq_5400
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 5
+  base_suffix: _Cortex-Neuron_kmer_rerun_20260515
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1

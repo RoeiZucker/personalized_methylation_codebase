@@ -1,0 +1,67 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+
+  # These HF datasets must already contain:
+  # - input_ids
+  # - attention_mask
+  # - labels
+  # - tissue_ids   <-- new
+  train_dataset_path:
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/tissue_project/R3_train
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/tissue_project/T3_train
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/tissue_project/3Q_train
+
+  eval_dataset_path:
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/tissue_project/R3_test
+
+  output_dir: /sci/labs/michall/roeizucker/trained_huggingface_models_location/tissue_prompt_runs/R3_tissue_prompt_lr_1e-06_bs_2
+
+task:
+  task_type: cpg_training
+  analysis_name: R3_tissue_prompt_lr_1e-06_bs_2
+  top_rows: -1
+
+testing_params:
+  test_mode: false
+
+random_state: 42
+verbose: true
+
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  task_level: token
+  blank_label: -100
+  use_lora: false
+  freeze_model: false
+  num_labels: 1
+
+  tissue_prompt:
+    num_tissue_types: 3
+    num_virtual_tokens: 4
+    tissue_embedding_dim: 256
+    projector_hidden_dim: 1024
+    token_labels_include_cls: true
+    ignore_index: -100
+    trust_remote_code: true
+
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  learning_rate: 1e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  lora_over_finetuned: false
+  load_dataset_to_memory: true
+  max_grad_norm: 1
+  number_of_steps: 10000
+  save_total_limit: 2
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: true

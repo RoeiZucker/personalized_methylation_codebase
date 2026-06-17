@@ -1,0 +1,78 @@
+# config.yaml
+
+paths:
+  assemblies:
+    HG38: "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+    MM10: "/sci/archive/michall/roeizucker/reference_genome/mm10.fa"
+  created_datasets: "/sci/archive/michall/roeizucker/huggingface_datasets_dir"
+  raw_data_paths : [
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.bigwig",
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652234_Liver-Hepatocytes-Z000000T3.hg38.bigwig",
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652235_Liver-Hepatocytes-Z0000043Q.hg38.bigwig",
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652236_Liver-Hepatocytes-Z0000044H.hg38.bigwig",
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652237_Liver-Hepatocytes-Z0000044M.hg38.bigwig",
+    "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652238_Liver-Hepatocytes-Z00000431.hg38.bigwig"
+    ]
+
+  per_variant_data_path : "/sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab.csv"
+  train_path: "/sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab_train.csv"
+  test_path:  "/sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab_test.csv"
+  
+
+task:
+  type: "cpg_seperating_sites"
+  assembly: "HG38"
+  input_mode: "raw"
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr6
+  - chr7
+  - chr8
+  - chr9
+  - chr10
+  - chr11
+  - chr12
+  - chr13
+  - chr14
+  - chr15
+  - chr16
+  - chr17
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  - chrX
+  - chrY
+
+  tokenizer_name : "InstaDeepAI/nucleotide-transformer-500m-1000g"
+
+  value_column:   "methyl_rate"
+  seq_size:       5400
+  test_size:      0.25
+  blank_label:    -100
+  variability_type:      "std"
+  variant_seperation_type:        "quantile"
+  variant_seperation_threshold : 0.95
+  window_seperation_type: "quantile"
+  window_seperation_threshold: 0.95
+
+  output_per_variant_data: true
+  output_window_data: true
+
+  # Output filenames are now provided under paths
+
+verbose: true
+
+random_state: 42
+testing_params:
+  test_mode: false
+  instcombine_rows_to_multiple_instances_format_path:  '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file.df'
+  add_borders_to_multiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_borders.df'
+  create_labels_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_labels.df'
+  add_sequence_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq.df'
+  result_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq_and_labels.df'

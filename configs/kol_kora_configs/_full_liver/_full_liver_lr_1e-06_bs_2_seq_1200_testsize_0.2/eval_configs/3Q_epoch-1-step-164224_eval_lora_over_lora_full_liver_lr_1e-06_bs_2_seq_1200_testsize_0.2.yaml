@@ -1,0 +1,36 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  variant_file_path: /home/users/roeizucker/tests/huggingface_datasets_dir/_full_liver/3Q_per_varaint_variability_full_liver_seq_1200_datasets.csv
+  model_paths:
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_lora_pretrain_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-1-step-164224
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_epoch-1-step-164224_retrain_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-1-step-33342
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_epoch-1-step-164224_retrain_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-2-step-66684
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_epoch-1-step-164224_retrain_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-3-step-100026
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_epoch-1-step-164224_retrain_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-4-step-133368
+  - /home/users/roeizucker/tests/trained_huggingface_models_location/_full_liver/3Q_epoch-1-step-164224_retrain_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-5-step-166710
+  dataset_path: /home/users/roeizucker/tests/huggingface_datasets_dir/_full_liver/3Q_retrain_full_liver_seq_1200_datasets_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: 3Q_epoch-1-step-164224_eval_lora_over_lora_full_liver_lr_1e-06_bs_2_seq_1200_testsize_0.2
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 5
+  base_suffix: _full_liver
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: true
+  freeze_mode: true
+  num_labels: 1
+  lora_over_finetuned: false

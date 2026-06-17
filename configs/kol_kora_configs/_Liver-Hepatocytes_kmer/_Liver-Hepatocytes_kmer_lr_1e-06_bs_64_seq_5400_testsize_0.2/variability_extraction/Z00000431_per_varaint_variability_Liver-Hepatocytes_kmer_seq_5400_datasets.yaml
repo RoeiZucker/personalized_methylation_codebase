@@ -1,0 +1,36 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  raw_data_paths:
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652234_Liver-Hepatocytes-Z000000T3.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652235_Liver-Hepatocytes-Z0000043Q.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652236_Liver-Hepatocytes-Z0000044H.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652237_Liver-Hepatocytes-Z0000044M.hg38.bigwig
+  per_variant_data_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z00000431_per_varaint_variability_Liver-Hepatocytes_kmer_seq_5400_datasets.csv
+task:
+  type: cpg_seperating_sites
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  test_size: 0
+  variability_type: std
+  variant_seperation_type: quantile
+  variant_seperation_threshold: 0.09
+  output_per_variant_data: true
+  output_window_data: false
+  seq_size: 5400
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true

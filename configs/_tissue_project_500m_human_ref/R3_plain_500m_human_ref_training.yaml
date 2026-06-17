@@ -1,0 +1,44 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  train_dataset_path:
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/_Liver-Hepatocytes_window/R3_plain_500m_human_ref_train
+  eval_dataset_path:
+    - /sci/archive/michall/roeizucker/huggingface_datasets_dir/_Liver-Hepatocytes_window/R3_plain_500m_human_ref_test
+  output_dir: /sci/labs/michall/roeizucker/trained_huggingface_models_location/plain_token_runs_500m_human_ref/R3_plain_500m_human_ref_lr_1e-06_bs_1
+task:
+  task_type: cpg_training
+  analysis_name: R3_plain_500m_human_ref_lr_1e-06_bs_1_minimum_20
+  top_rows: 5000
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-500m-human-ref
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_model: false
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  learning_rate: 1e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  lora_over_finetuned: false
+  load_dataset_to_memory: true
+  max_grad_norm: 1
+  number_of_steps: 10000
+  save_total_limit: 2
+  min_number_of_cpg_sites : 20
+  add_epoch_end_save_callback: true
+  add_epoch_end_prediction: true
+  save_at_end: false
+  continue_from_last: false

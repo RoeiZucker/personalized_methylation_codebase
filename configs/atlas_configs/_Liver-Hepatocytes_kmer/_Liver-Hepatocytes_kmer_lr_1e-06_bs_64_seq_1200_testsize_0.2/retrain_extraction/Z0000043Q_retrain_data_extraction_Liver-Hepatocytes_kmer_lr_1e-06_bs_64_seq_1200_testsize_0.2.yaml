@@ -1,0 +1,48 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  raw_data_path: /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652235_Liver-Hepatocytes-Z0000043Q.hg38.bigwig
+  intermediate_train_data_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/temp_train2026-05-1723:40:07.274387.csv
+  intermediate_test_data_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/temp_test2026-05-1723:40:07.274387.csv
+  hf_dataset_train_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z0000043Q_retrain_Liver-Hepatocytes_kmer_seq_1200_datasets_train
+  hf_dataset_test_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z0000043Q_retrain_Liver-Hepatocytes_kmer_seq_1200_datasets_test
+task:
+  type: cpg_extraction
+  assembly: HG38
+  value_column: methyl_rate
+  input_mode: raw_input
+  seq_size: 1200
+  test_size: 0.2
+  blank_label: -100
+  use_fasta: true
+  shuffle: true
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  output_preprocessed_data: false
+  output_intermediate_data: true
+  output_hf_dataset: true
+  window_type: standart_no_overlap
+  override_dataset: false
+  train_test_seperation: kmer_sample_filtration
+  clear_generator_cache: true
+  replace_min1: false
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+variant_filtering:
+  use_variant_filtering: false
+  variant_filtering_upper_bound: -1
+  variant_filtering_lower_bound: -1

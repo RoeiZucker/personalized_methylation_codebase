@@ -1,0 +1,24 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  raw_data_paths:
+  - /home/users/roeizucker/tests/downloaded_datasets/GSM5652176_Adipocytes-Z000000T7.hg38.bigwig
+  - /home/users/roeizucker/tests/downloaded_datasets/GSM5652178_Adipocytes-Z000000T5.hg38.bigwig
+  per_variant_data_path: /home/users/roeizucker/tests/huggingface_datasets_dir/_pipeline_test/T9_per_varaint_variability_pipeline_test_seq_5400_datasets.csv
+task:
+  type: cpg_seperating_sites
+  chromosomes:
+  - chr5
+  test_size: 0
+  variability_type: std
+  variant_seperation_type: quantile
+  variant_seperation_threshold: 0.09
+  output_per_variant_data: true
+  output_window_data: false
+  seq_size: 5400
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true

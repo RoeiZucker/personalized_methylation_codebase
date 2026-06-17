@@ -1,0 +1,37 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  variant_file_path:  /sci/archive/michall/roeizucker/huggingface_datasets_dir/R3_per_varaint_variability_after_HPO_lr_06_bs_2_chr1-10.csv
+  atlas_dataset_paths:
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/31_all_chr1-10_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/3Q_all_chr1-10_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/4H_all_chr1-10_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/4M_all_chr1-10_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/T3_all_chr1-10_train
+  model_paths:
+  - "a"
+  
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/R3_all_chr1-10_train
+task:
+  task_type: cpg_evaluation
+  sub_task: atlas_evaluation
+  analysis_name: chr1-10_atlas_eval
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 10
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  lora_over_retrain: true
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1

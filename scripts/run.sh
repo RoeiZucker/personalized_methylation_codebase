@@ -1,0 +1,9 @@
+. /cs/usr/roeizucker/new_storage/new_python_env/bin/activate
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652233_Liver-Hepatocytes-Z000000R3.yaml
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652234_Liver-Hepatocytes-Z000000T3.yaml
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652235_Liver-Hepatocytes-Z0000043Q.yaml
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652236_Liver-Hepatocytes-Z0000044H.yaml
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652237_Liver-Hepatocytes-Z0000044M.yaml
+python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/scripts/data_extraction_script.py /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/kaplan_files/GSM5652238_Liver-Hepatocytes-Z00000431.yaml
+
+

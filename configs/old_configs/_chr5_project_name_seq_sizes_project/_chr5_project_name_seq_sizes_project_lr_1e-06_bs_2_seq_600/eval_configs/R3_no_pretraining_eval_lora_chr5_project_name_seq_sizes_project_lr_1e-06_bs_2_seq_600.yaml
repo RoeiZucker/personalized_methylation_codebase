@@ -1,0 +1,32 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  variant_file_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_chr5_project_name_seq_sizes_project/R3_per_varaint_variability_chr5_project_name_seq_sizes_project_datasets.csv
+  model_paths:
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/_chr5_project_name_seq_sizes_project/R3_no_pretraining_retrain_lora_chr5_project_name_seq_sizes_project_lr_1e-06_bs_2_seq_600/epoch-3-step-359985
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/_chr5_project_name_seq_sizes_project/R3_no_pretraining_retrain_lora_chr5_project_name_seq_sizes_project_lr_1e-06_bs_2_seq_600/epoch-2-step-239990
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/_chr5_project_name_seq_sizes_project/R3_no_pretraining_retrain_lora_chr5_project_name_seq_sizes_project_lr_1e-06_bs_2_seq_600/epoch-1-step-119995
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_chr5_project_name_seq_sizes_project/R3_retrain_chr5_project_name_seq_sizes_project_datasets_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: R3_no_pretraining_eval_lora_chr5_project_name_seq_sizes_project_lr_1e-06_bs_2_seq_600
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 10
+  base_suffix: _chr5_project_name_seq_sizes_project
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1

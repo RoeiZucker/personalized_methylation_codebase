@@ -1,0 +1,40 @@
+params : 
+    project_suffix                : _different_epoch_length_dataset_override_test
+    bigwig_files                  : ['/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.bigwig',
+                                     '/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652234_Liver-Hepatocytes-Z000000T3.hg38.bigwig', 
+                                     '/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652235_Liver-Hepatocytes-Z0000043Q.hg38.bigwig']
+    names                         : ['R3', 'T3', '3Q', ]
+    created_configs_path          : /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/_different_epoch_length_dataset_override_test
+    tokenizer_name                : InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+    dataset_base_dir              : /sci/archive/michall/roeizucker/huggingface_datasets_dir/
+    base_model_location           : /sci/labs/michall/roeizucker/trained_huggingface_models_location
+    model_type                    : regression_analysis
+    train_test_seperation         : kmer_sample_filtration
+    chromosomes                   : ["chr5"]
+    use_lora                      : True
+    freeze_model                  : True
+    num_labels                    : 1
+    number_of_bins                : 5
+    load_best_model_at_end        : False
+    num_train_epoch               : 5
+    num_pretrain_epoch            : 2
+    per_device_train_batch_sizes  : [2]
+    per_device_eval_batch_size    : 2
+    learning_rates                : [1e-06]
+    metric_for_best_model         : mse
+    save_stratagy                 : steps
+    number_of_steps               : 10000
+    seq_sizes                     : [5400,600]
+    test_sizes                    : [0.2]
+    save_total_limit              : 2
+    add_epoch_end_save_callback   : True
+    save_at_end                   : False
+    continue_from_last            : True
+    use_variant_filtering         : True
+    override_dataset              : False
+    variant_filtering_upper_bound : 0.09
+    variant_filtering_lower_bound : 0
+    max_grad_norm                 : 1
+    top_rows                      : -1
+    load_dataset_to_memory        : True
+    variant_file_path             : /sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab_without_min1.csv

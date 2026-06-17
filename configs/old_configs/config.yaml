@@ -1,0 +1,31 @@
+# config.yaml
+
+paths:
+  assemblies:
+    HG38: "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+    MM10: "/sci/archive/michall/roeizucker/reference_genome/mm10.fa"
+  created_datasets: "/sci/archive/michall/roeizucker/Tom_project/created_datasets"
+  train_path: "/sci/archive/michall/roeizucker/Tom_project/created_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38_train.csv"
+  test_path:  "/sci/archive/michall/roeizucker/Tom_project/created_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38_test.csv"
+  
+
+task:
+  assembly:       "HG38"
+  input_csv:      '/sci/archive/michall/roeizucker/Tom_project/pre_processed_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.csv'
+  value_column:   "methyl_rate"
+  seq_size:       5400
+  test_size:      0.25
+  blank_label:    -100
+  use_fasta:      true
+  shuffle:        true
+
+  # Output filenames are now provided under paths
+
+random_state: 42
+testing_params:
+  test_mode: false
+  instcombine_rows_to_multiple_instances_format_path:  '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file.df'
+  add_borders_to_multiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_borders.df'
+  create_labels_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_labels.df'
+  add_sequence_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq.df'
+  result_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq_and_labels.df'

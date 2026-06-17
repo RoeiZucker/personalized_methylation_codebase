@@ -1,0 +1,49 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  raw_data_path: /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652343_Bladder-Epithelial-Z000000QP.hg38.bigwig
+  intermediate_train_data_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Bladder-Epithelial_kmer_rerun_20260517_112623/temp_train2026-05-1711:26:24.535905.csv
+  intermediate_test_data_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Bladder-Epithelial_kmer_rerun_20260517_112623/temp_test2026-05-1711:26:24.535905.csv
+  hf_dataset_train_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Bladder-Epithelial_kmer_rerun_20260517_112623/Z000000QP_pretrain_Bladder-Epithelial_kmer_rerun_20260517_112623_seq_600_datasets_train
+  hf_dataset_test_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Bladder-Epithelial_kmer_rerun_20260517_112623/Z000000QP_pretrain_Bladder-Epithelial_kmer_rerun_20260517_112623_seq_600_datasets_test
+  variant_file_path: /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Bladder-Epithelial_kmer_rerun_20260517_112623/Z000000QP_per_varaint_variability_Bladder-Epithelial_kmer_rerun_20260517_112623_seq_600_datasets.csv
+task:
+  type: cpg_extraction
+  assembly: HG38
+  value_column: methyl_rate
+  input_mode: raw_input
+  seq_size: 600
+  test_size: 0
+  blank_label: -100
+  use_fasta: true
+  shuffle: true
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  output_preprocessed_data: false
+  output_intermediate_data: true
+  output_hf_dataset: true
+  window_type: standart_no_overlap
+  override_dataset: true
+  train_test_seperation: kmer_sample_filtration
+  clear_generator_cache: true
+  replace_min1: true
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+variant_filtering:
+  use_variant_filtering: true
+  variant_filtering_upper_bound: 0.09
+  variant_filtering_lower_bound: 0

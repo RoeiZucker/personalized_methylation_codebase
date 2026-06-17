@@ -1,0 +1,41 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  train_dataset_path:
+  - /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Bladder-Epithelial_kmer/Z00000450_retrain_Bladder-Epithelial_kmer_seq_600_datasets_train
+  output_dir: /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Bladder-Epithelial_kmer/Z00000450_epoch-2-step-210328_retrain_Bladder-Epithelial_kmer_lr_1e-06_bs_64_seq_600_testsize_0.2
+  trained_model_path: /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Bladder-Epithelial_kmer/Z00000450_pretrain_Bladder-Epithelial_kmer_lr_1e-06_bs_64_seq_600_testsize_0.2/epoch-2-step-210328
+task:
+  task_type: cpg_retraining
+  analysis_name: Z00000450_epoch-2-step-210328_retrain_Bladder-Epithelial_kmer_lr_1e-06_bs_64_seq_600_testsize_0.2
+  top_rows: -1
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 5
+  per_device_train_batch_size: 128
+  per_device_eval_batch_size: 128
+  learning_rate: 1.0e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  lora_over_finetuned: false
+  load_dataset_to_memory: false
+  max_grad_norm: 1
+  number_of_steps: 10000
+  save_total_limit: 2
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: true

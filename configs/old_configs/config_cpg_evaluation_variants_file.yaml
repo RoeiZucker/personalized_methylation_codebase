@@ -1,0 +1,62 @@
+# config.yaml
+
+paths:
+  assemblies:
+    HG38: "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+    MM10: "/sci/archive/michall/roeizucker/reference_genome/mm10.fa"
+  created_datasets: "/sci/archive/michall/roeizucker/Tom_project/created_datasets"
+  # dataset_path:  "/sci/archive/michall/roeizucker/huggingface_datasets_dir/ENCFF854OPR_sample_1_train_ratio_0.75_900_test"
+  dataset_path: "/sci/archive/michall/roeizucker/huggingface_datasets_dir/ENCFF854OPR_retrain_dataset_test"
+  # model_path: "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/ nucleotide-transformer-500m-1000g-temp_sufENCFF713LYH_sample_1_train_ratio_0.75_900_train_0.02_ignore_0_nucleotide-transformer-500m-1000g_REGRESSION_ANALYSIS"
+  # model_path: "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-500m-1000g-temp_sufENCFF713LYH_sample_1_train_ratio_0.75_900_train_0.02_ignore_0_nucleotide-transformer-500m-1000g_REGRESSION_ANALYSIS/checkpoint-803722"
+  model_paths : [
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/ENCFF713LYH_ENCFF479QRW_all_chrom_first_test_killable/checkpoint-537752",
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/ENCFF854OPR_retrain_all_chrom/checkpoint-21440",
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/ENCFF854OPR_retrain_all_chrom/checkpoint-42880",
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/ENCFF854OPR_retrain_all_chrom/checkpoint-64320"
+  ]
+  variant_file_path : "/sci/archive/michall/roeizucker/Tom_project/created_datasets/variant_data_for_analysis_1:6.csv"
+
+task:
+  task_type: "cpg_evaluation"
+  # sub_task: "evaluate_single_checkpoint"
+  analysis_name : "cpg_test_delete_me"
+  sub_task: "evaluate_multiple_checkpoints"
+  assembly:       "HG38"
+  test_dataset:   "fill here"
+  train_dataset:   false
+  use_variant_file : true   # might need to change that name
+  vriant_grouping_method : "bins"
+  number_of_bins: 10
+
+  sequence_col: "sequence"   # name of the field in your Dataset
+  label_col:    "labels"     # name of the field holding per‐base label lists
+  top_rows: 1000  # number of rows to evaluate, set to -1 for all rows
+
+model:
+  model_name: "nucleotide-transformer-500m-1000g"
+  model_repo: "InstaDeepAI" 
+  model_type: "regression_analysis"  # or "CLASSIFICATION_ANALYSIS
+  blank_label: -100
+  is_lora : true
+  num_labels: 1  # for regression, set to 1; for classification, set to the number of classes
+
+
+evaluation:
+  batch_size:     16
+  device:         "cuda"
+  num_workers:    4
+  threshold:      0.5
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - roc_auc
+    - pr_auc
+    - mcc
+
+  # Output filenames are now provided under paths
+
+verbose: true
+random_state: 42

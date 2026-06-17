@@ -1,0 +1,15 @@
+paths:
+  prediction_root_dir: /sci/labs/michall/roeizucker/_kol_kora_high_only_Liver-Hepatocytes_kmer_3/_kol_kora_high_only_Liver-Hepatocytes_kmer
+  variability_base_dir: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_saved_predictions
+  analysis_name: kol_kora_high_only_liver_hepatocytes_kmer_eval
+  top_rows: -1
+  number_of_bins: 5
+  base_suffix: _kol_kora_high_only_saved_predictions
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: false
+model: {}

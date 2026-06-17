@@ -1,0 +1,72 @@
+# config.yaml
+
+paths:
+  assemblies:
+    HG38: "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+    MM10: "/sci/archive/michall/roeizucker/reference_genome/mm10.fa"
+  created_datasets: "/sci/archive/michall/roeizucker/Tom_project/created_datasets"
+  # dataset_path:  "/sci/archive/michall/roeizucker/huggingface_datasets_dir/ENCFF854OPR_sample_1_train_ratio_0.75_900_test"
+  dataset_path: "/cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/HF_databases/genecode_v47_900_train_1_ignore_0.95_LORA_test"
+  # model_path: "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/ nucleotide-transformer-500m-1000g-temp_sufENCFF713LYH_sample_1_train_ratio_0.75_900_train_0.02_ignore_0_nucleotide-transformer-500m-1000g_REGRESSION_ANALYSIS"
+  # model_path: "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-2.5b-multi-species-genecode_v47_200_train_1_ignore_0.95_LORA/checkpoint-272452"
+  # model_paths : [
+  #   "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-2.5b-multi-species-genecode_v47_200_train_1_ignore_0.95_LORA/checkpoint-272452/",
+  #   "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-2.5b-multi-species-genecode_v47_200_train_1_ignore_0.95_LORA/checkpoint-544904/"
+  # ]
+
+  model_paths : [
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-2.5b-multi-species-genecode_v47_900_train_1_ignore_0.95_LORA/checkpoint-151664",
+    "/sci/archive/michall/roeizucker/trained_huggingfacce_models_location/InstaDeepAI/nucleotide-transformer-2.5b-multi-species-genecode_v47_900_train_1_ignore_0.95_LORA/checkpoint-303328"
+  ]
+
+
+# testing_params:
+  # test_mode: true
+  # instcombine_rows_to_multiple_instances_format_path:  '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file.df'
+  # add_borders_to_multiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_borders.df'
+  # create_labels_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_labels.df'
+  # add_sequence_formultiple_instance_format_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq.df'
+  # result_df_path: '/sci/archive/michall/roeizucker/Tom_project/created_datasets/inst_file_with_seq_and_labels.df'
+
+task:
+  task_type: "splice_evaluation"
+  # analysis_name : "splice_900_2.5b_top5000_test"
+  analysis_name : "splice_900_2.5b_top5000_LORA_test"
+  # sub_task: "evaluate_single_checkpoint"
+  sub_task: "evaluate_multiple_checkpoints"
+  assembly:       "HG38"
+  test_dataset:   "fill here"
+  train_dataset:   false
+  sequence_col: "sequence"   # name of the field in your Dataset
+  label_col:    "labels"     # name of the field holding per‐base label lists
+  top_rows: 5000  # number of rows to evaluate, set to -1 for all rows
+
+model:
+  model_name: "nucleotide-transformer-2.5b-multi-species"
+  model_repo: "InstaDeepAI" 
+  # model_type: "regression_analysis"  # or "CLASSIFICATION_ANALYSIS
+  model_type: "classification_analysis"  # or "CLASSIFICATION_ANALYSIS
+  blank_label: -100
+  is_lora : true
+  num_labels: 3  # for regression, set to 1; for classification, set to the number of classes
+
+
+verbouse: true
+
+evaluation:
+  batch_size:     16
+  device:         "cuda"
+  num_workers:    4
+  threshold:      0.5
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - roc_auc
+    - pr_auc
+    - mcc
+
+  # Output filenames are now provided under paths
+
+random_state: 42

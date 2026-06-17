@@ -1,0 +1,48 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  raw_data_path: /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652234_Liver-Hepatocytes-Z000000T3.hg38.bigwig
+  intermediate_train_data_path: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/notebooks/results/Z000000T3_token_cls_seq_5400_train_intermediate.csv
+  intermediate_test_data_path: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/notebooks/results/Z000000T3_token_cls_seq_5400_test_intermediate.csv
+  hf_dataset_train_path: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/notebooks/results/Z000000T3_token_cls_seq_5400_train
+  hf_dataset_test_path: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/notebooks/results/Z000000T3_token_cls_seq_5400_test
+
+task:
+  type: cpg_token_classification_extraction
+  assembly: HG38
+  value_column: methyl_rate
+  input_mode: raw_input
+  seq_size: 5400
+  test_size: 0.2
+  blank_label: -100
+  use_fasta: true
+  shuffle: true
+  chromosomes:
+  - chr5
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  output_preprocessed_data: false
+  output_intermediate_data: true
+  output_hf_dataset: true
+  window_type: standart_no_overlap
+  override_dataset: true
+  train_test_seperation: random_sample_filtration
+  clear_generator_cache: true
+  replace_min1: true
+  token_label_binning:
+    method: fixed
+    low: 0.2
+    high: 0.8
+
+testing_params:
+  test_mode: false
+  raw_data_top_rows: -1
+
+random_state: 42
+verbose: true
+
+variant_filtering:
+  use_variant_filtering: false
+  variant_filtering_upper_bound: -1
+  variant_filtering_lower_bound: -1

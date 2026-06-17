@@ -1,0 +1,25 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  raw_data_paths:
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652200_Heart-Fibroblasts-Z0000043R.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652201_Heart-Fibroblasts-Z0000041V.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652202_Heart-Fibroblasts-Z0000041W.hg38.bigwig
+  per_variant_data_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_sixteen_shards_of_adonalsium_Heart_Fibroblasts/1X_per_varaint_variability_sixteen_shards_of_adonalsium_Heart_Fibroblasts_seq_1200_datasets.csv
+task:
+  type: cpg_seperating_sites
+  chromosomes:
+  - chr19
+  test_size: 0
+  variability_type: std
+  variant_seperation_type: quantile
+  variant_seperation_threshold: 0.09
+  output_per_variant_data: true
+  output_window_data: false
+  seq_size: 1200
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true

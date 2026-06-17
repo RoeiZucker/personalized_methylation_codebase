@@ -1,0 +1,49 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  hf_dataset_test_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z00000431_retrain_Liver-Hepatocytes_kmer_seq_600_datasets_test_high_only
+  hf_dataset_train_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z00000431_retrain_Liver-Hepatocytes_kmer_seq_600_datasets_train_high_only
+  intermediate_test_data_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/temp_test2026-05-2420:27:39.885174.csv
+  intermediate_train_data_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/temp_train2026-05-2420:27:39.885174.csv
+  raw_data_path: /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652238_Liver-Hepatocytes-Z00000431.hg38.bigwig
+  variant_file_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Liver-Hepatocytes_kmer/Z00000431_per_varaint_variability_Liver-Hepatocytes_kmer_seq_600_datasets.csv
+random_state: 42
+task:
+  assembly: HG38
+  blank_label: -100
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  clear_generator_cache: true
+  input_mode: raw_input
+  output_hf_dataset: true
+  output_intermediate_data: true
+  output_preprocessed_data: false
+  override_dataset: false
+  replace_min1: false
+  seq_size: 600
+  shuffle: true
+  test_size: 0.2
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  train_test_seperation: kmer_sample_filtration
+  type: cpg_extraction
+  use_fasta: true
+  value_column: methyl_rate
+  window_type: standart_no_overlap
+testing_params:
+  test_mode: false
+variant_filtering:
+  use_variant_filtering: true
+  variant_filtering_lower_bound: 0.09
+  variant_filtering_upper_bound: 2
+verbose: true

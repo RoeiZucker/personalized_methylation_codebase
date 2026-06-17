@@ -1,0 +1,41 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  train_dataset_path:
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652233_Liver-Hepatocytes-Z000000R3_pretrain_2.5param_chr5_no_lora_filter_variants_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652234_Liver-Hepatocytes-Z000000T3_pretrain_2.5param_chr5_no_lora_filter_variants_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652235_Liver-Hepatocytes-Z0000043Q_pretrain_2.5param_chr5_no_lora_filter_variants_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652237_Liver-Hepatocytes-Z0000044M_pretrain_2.5param_chr5_no_lora_filter_variants_train
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652238_Liver-Hepatocytes-Z00000431_pretrain_2.5param_chr5_no_lora_filter_variants_train
+  output_dir: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/GSM5652236_Liver-Hepatocytes-Z0000044H_pretrain_2.5param_chr5_no_lora_filter_variants
+task:
+  task_type: cpg_training
+  analysis_name: GSM5652236_Liver-Hepatocytes-Z0000044H_pretrain_2.5param_chr5_no_lora_filter_variants
+  top_rows: -1
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  learning_rate: 1.0e-05
+  metric_for_best_model: mse
+  save_stratagy: steps
+  number_of_steps: 5000
+  save_total_limit: 3
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: true

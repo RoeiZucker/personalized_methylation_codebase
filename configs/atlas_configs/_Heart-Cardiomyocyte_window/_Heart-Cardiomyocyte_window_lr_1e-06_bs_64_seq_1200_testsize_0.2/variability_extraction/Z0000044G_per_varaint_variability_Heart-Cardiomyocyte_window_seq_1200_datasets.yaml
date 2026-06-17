@@ -1,0 +1,36 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  raw_data_paths:
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652213_Heart-Cardiomyocyte-Z0000044K.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652214_Heart-Cardiomyocyte-Z0000044N.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652215_Heart-Cardiomyocyte-Z0000044P.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652216_Heart-Cardiomyocyte-Z0000044Q.hg38.bigwig
+  - /sci/archive/michall/roeizucker/downloaded_datasets/GSM5652217_Heart-Cardiomyocyte-Z0000044R.hg38.bigwig
+  per_variant_data_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Heart-Cardiomyocyte_window/Z0000044G_per_varaint_variability_Heart-Cardiomyocyte_window_seq_1200_datasets.csv
+task:
+  type: cpg_seperating_sites
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  test_size: 0
+  variability_type: std
+  variant_seperation_type: quantile
+  variant_seperation_threshold: 0.09
+  output_per_variant_data: true
+  output_window_data: false
+  seq_size: 1200
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true

@@ -1,0 +1,42 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  train_dataset_path:
+  - /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Breast-Basal-Epithelial_window_rerun_20260517_112623/Z000000V6_pretrain_Breast-Basal-Epithelial_window_rerun_20260517_112623_seq_5400_datasets_train
+  - /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Breast-Basal-Epithelial_window_rerun_20260517_112623/Z000000VG_pretrain_Breast-Basal-Epithelial_window_rerun_20260517_112623_seq_5400_datasets_train
+  - /cs/usr/roeizucker/new_storage/huggingface_datasets_dir/rerun_20260517_112623/_Breast-Basal-Epithelial_window_rerun_20260517_112623/Z000000VL_pretrain_Breast-Basal-Epithelial_window_rerun_20260517_112623_seq_5400_datasets_train
+  output_dir: /cs/usr/roeizucker/new_storage/trained_huggingface_models_location/rerun_20260517_112623/_Breast-Basal-Epithelial_window_rerun_20260517_112623/Z0000043E_pretrain_Breast-Basal-Epithelial_window_rerun_20260517_112623_lr_1e-06_bs_64_seq_5400_testsize_0.2
+task:
+  task_type: cpg_training
+  analysis_name: Z0000043E_pretrain_Breast-Basal-Epithelial_window_rerun_20260517_112623_lr_1e-06_bs_64_seq_5400_testsize_0.2
+  top_rows: -1
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 2
+  per_device_train_batch_size: 14
+  per_device_eval_batch_size: 14
+  learning_rate: 1.0e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  lora_over_finetuned: false
+  load_dataset_to_memory: true
+  max_grad_norm: 1
+  number_of_steps: 10000
+  save_total_limit: 2
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: false

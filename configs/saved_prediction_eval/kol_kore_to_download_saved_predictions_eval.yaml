@@ -1,0 +1,15 @@
+paths:
+  prediction_root_dir: /sci/labs/michall/roeizucker/kol_kore_results/to_download
+  variability_base_dir: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_saved_predictions
+  analysis_name: kol_kore_to_download_saved_predictions_eval
+  top_rows: -1
+  number_of_bins: 5
+  base_suffix: _kol_kore_saved_predictions
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model: {}

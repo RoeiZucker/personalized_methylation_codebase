@@ -1,0 +1,35 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  variant_file_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042F_per_varaint_variability_Cortex-Neuron_window_seq_5400_datasets.csv
+  model_paths:
+  - /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Cortex-Neuron_window/Z0000042F_no_pretraining_retrain_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2/epoch-1-step-13735
+  - /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Cortex-Neuron_window/Z0000042F_no_pretraining_retrain_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2/epoch-2-step-27470
+  - /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Cortex-Neuron_window/Z0000042F_no_pretraining_retrain_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2/epoch-3-step-41205
+  - /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Cortex-Neuron_window/Z0000042F_no_pretraining_retrain_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2/epoch-4-step-54940
+  - /shared/cycle1_huji_linial_prj/roei_test/trained_huggingface_models_location/_Cortex-Neuron_window/Z0000042F_no_pretraining_retrain_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2/epoch-5-step-68675
+  dataset_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042F_retrain_Cortex-Neuron_window_seq_5400_datasets_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: Z0000042F_no_pretraining_eval_Cortex-Neuron_window_lr_1e-06_bs_64_seq_5400_testsize_0.2
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 5
+  base_suffix: _Cortex-Neuron_window
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
+  lora_over_finetuned: false

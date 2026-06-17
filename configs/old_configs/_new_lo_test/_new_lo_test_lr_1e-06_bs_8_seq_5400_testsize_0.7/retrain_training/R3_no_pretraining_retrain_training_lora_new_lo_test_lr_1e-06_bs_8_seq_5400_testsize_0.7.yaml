@@ -1,0 +1,40 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  train_dataset_path:
+  - /sci/archive/michall/roeizucker/huggingface_datasets_dir/_new_lo_test/R3_retrain_new_lo_test_datasets_train
+  output_dir: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/_new_lo_test/R3_no_pretraining_retrain_lora_new_lo_test_lr_1e-06_bs_8_seq_5400_testsize_0.7
+task:
+  task_type: cpg_training
+  analysis_name: R3_no_pretraining_retrain_lora_new_lo_test_lr_1e-06_bs_8_seq_5400_testsize_0.7
+  top_rows: -1
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: true
+  freeze_mode: true
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 3
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 2
+  learning_rate: 1e-06
+  metric_for_best_model: mse
+  save_stratagy: steps
+  lora_over_finetuned: true
+  load_dataset_to_memory: true
+  max_grad_norm: 1
+  number_of_steps: 25000
+  save_total_limit: 3
+  add_epoch_end_save_callback: true
+  save_at_end: false
+  continue_from_last: true

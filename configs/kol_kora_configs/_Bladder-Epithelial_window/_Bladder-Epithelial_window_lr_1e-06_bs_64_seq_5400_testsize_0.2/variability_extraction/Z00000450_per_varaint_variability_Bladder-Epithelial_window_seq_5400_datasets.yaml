@@ -1,0 +1,35 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  raw_data_paths:
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652342_Bladder-Epithelial-Z000000QM.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652343_Bladder-Epithelial-Z000000QP.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652344_Bladder-Epithelial-Z0000043F.hg38.bigwig
+  - /shared/cycle1_huji_linial_prj/roei_test/downloaded_datasets/GSM5652345_Bladder-Epithelial-Z0000044L.hg38.bigwig
+  per_variant_data_path: /shared/cycle1_huji_linial_prj/roei_test/huggingface_datasets_dir/_Bladder-Epithelial_window/Z00000450_per_varaint_variability_Bladder-Epithelial_window_seq_5400_datasets.csv
+task:
+  type: cpg_seperating_sites
+  chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  test_size: 0
+  variability_type: std
+  variant_seperation_type: quantile
+  variant_seperation_threshold: 0.09
+  output_per_variant_data: true
+  output_window_data: false
+  seq_size: 5400
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true

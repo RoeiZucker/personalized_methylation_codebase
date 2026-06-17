@@ -1,0 +1,50 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  output_dir: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_retrain
+  trained_model_path: /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_pretrain/checkpoint-105458
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_basic_test
+  variant_file_path: "/sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab.csv"
+  model_paths:
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_pretrain/checkpoint-105458
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_pretrain/checkpoint-210916
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_pretrain/checkpoint-316374
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_retrain/checkpoint-50613
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_retrain/checkpoint-16871
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/kaplan_files_chr1_GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_retrain/checkpoint-33742
+task:
+  task_type: cpg_evaluation
+  analysis_name: GSM5652237_Liver-Hepatocytes-Z0000044M_chr1_evaluate
+  sub_task: evaluate_multiple_checkpoints
+  sequence_col: sequence
+  label_col: labels
+  top_rows: -1
+  use_variant_file : true   # might need to change that name
+  vriant_grouping_method : "bins"
+  number_of_bins: 40
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-500m-1000g
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: true
+  freeze_mode: true
+  num_labels: 1
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  learning_rate: 1.0e-05
+  metric_for_best_model: mse
+  save_stratagy: epoch
+evaluation:
+  batch_size: 8
+  device: cuda
+  metrics: []

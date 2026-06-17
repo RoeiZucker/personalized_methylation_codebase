@@ -1,0 +1,32 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  variant_file_path: /sci/archive/michall/roeizucker/Tom_project/created_datasets/Liver-Hepatocytes_Kaplan_lab_without_min1.csv
+  model_paths:
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/3Q_pretrain_after_revert_without_-1/epoch-1-step-32917
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/3Q_epoch-1-step-32917_retrain_after_revert_without_-1/epoch-3-step-39534
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/3Q_epoch-1-step-32917_retrain_after_revert_without_-1/epoch-2-step-26356
+  - /sci/archive/michall/roeizucker/trained_huggingfacce_models_location/3Q_epoch-1-step-32917_retrain_after_revert_without_-1/epoch-1-step-13178
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/3Q_retrain_data_extraction_after_revert_without_-1_changed_bound_condition_with_variant_file_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: 3Q_epoch-1-step-32917_eval_after_revert_without_-1_other_dataset4
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 3
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1

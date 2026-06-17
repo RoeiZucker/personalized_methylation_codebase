@@ -1,0 +1,53 @@
+# config.yaml
+
+paths:
+  assemblies:
+    HG38: "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+    MM10: "/sci/archive/michall/roeizucker/reference_genome/mm10.fa"
+  created_datasets: "/sci/archive/michall/roeizucker/huggingface_datasets_dir"
+  raw_data_path : "/cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/downloaded_datasets/ENCFF479QRW.bigWig"
+
+  intermediate_train_data_path : "/sci/archive/michall/roeizucker/Tom_project/created_datasets/temp_train.csv"
+  intermediate_test_data_path : "/sci/archive/michall/roeizucker/Tom_project/created_datasets/temp_test.csv"
+
+  hf_dataset_train_path : "/sci/archive/michall/roeizucker/huggingface_datasets_dir/ENCFF479QRW_chr7:8_random_windows_train"
+  hf_dataset_test_path : "/sci/archive/michall/roeizucker/huggingface_datasets_dir/ENCFF479QRW_chr7:8_random_windows_test"
+
+  generetor_cache_dir: "/sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator"
+    
+
+task:
+  type: "cpg_extraction"
+  assembly: "HG38"
+  input_mode: "raw"
+  window_type: "standart_no_overlap"
+  train_test_seperation: "random_sample_filtration"
+  # chromosomes: None
+  chromosomes: ["chr7","chr8"]
+  # chromosomes: ["chr5"]
+  tokenizer_name : "InstaDeepAI/nucleotide-transformer-500m-1000g"
+
+  input_csv:      '/sci/archive/michall/roeizucker/Tom_project/pre_processed_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.csv'
+  value_column:   "methyl_rate"
+  seq_size:       5400
+  test_size:      0.00
+  blank_label:    -100
+  use_fasta:      true
+  shuffle:        true
+  
+  clear_generator_cache: true
+
+  output_preprocessed_data: false
+  output_intermediate_data: true
+  output_hf_dataset : true
+
+  # Output filenames are now provided under paths
+
+testing_params:
+  test_mode: false
+
+verbose: true
+
+
+
+random_state: 42

@@ -1,0 +1,40 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  variant_file_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_sixteen_liver_window/3Q_per_varaint_variability_sixteen_liver_window_seq_1200_datasets.csv
+  model_paths:
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-6-step-110670
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-10-step-184450
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-5-step-92225
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-2-step-36890
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-8-step-147560
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-3-step-55335
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-7-step-129115
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-9-step-166005
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-4-step-73780
+  - /sci/labs/michall/roeizucker/trained_huggingface_models_location/_sixteen_liver_window/3Q_no_pretraining_retrain_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2/epoch-1-step-18445
+  dataset_path: /sci/archive/michall/roeizucker/huggingface_datasets_dir/_sixteen_liver_window/3Q_retrain_sixteen_liver_window_seq_1200_datasets_test
+task:
+  task_type: cpg_evaluation
+  sub_task: evaluate_multiple_checkpoints
+  analysis_name: 3Q_no_pretraining_eval_sixteen_liver_window_lr_1e-06_bs_2_seq_1200_testsize_0.2
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 5
+  base_suffix: _sixteen_liver_window
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
+  lora_over_finetuned: false

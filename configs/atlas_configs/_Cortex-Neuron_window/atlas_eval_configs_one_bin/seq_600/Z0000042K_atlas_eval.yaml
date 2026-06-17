@@ -1,0 +1,37 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /home/users/roeizucker/.cache/huggingface/datasets/generator
+  variant_file_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042K_per_varaint_variability_Cortex-Neuron_window_seq_600_datasets.csv
+  atlas_dataset_paths:
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z000000TF_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042F_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042H_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042J_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042M_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042P_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  - /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z000000TD_pretrain_Cortex-Neuron_window_seq_600_datasets_train
+  dataset_path: /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir/_Cortex-Neuron_window/Z0000042K_retrain_Cortex-Neuron_window_seq_600_datasets_test
+  model_paths: []
+task:
+  task_type: cpg_evaluation
+  sub_task: atlas_evaluation
+  analysis_name: Z0000042K_atlas_eval_Cortex-Neuron_window_seq_600_one_bin
+  top_rows: -1
+  use_variant_file: true
+  vriant_grouping_method: bins
+  number_of_bins: 1
+  base_suffix: _Cortex-Neuron_window
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: regression_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_mode: false
+  num_labels: 1
