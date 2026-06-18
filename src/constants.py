@@ -1,3 +1,4 @@
+import os
 CPG_TRAINING_TASK_TYPE = "cpg_training"
 CPG_RETRAINING_TASK_TYPE = "cpg_retraining"
 CHECKPINT_SAVE_PREFIX = "checkpoint-"
@@ -23,6 +24,8 @@ BLANK_LABEL_VALUE = -100
 SINGLE_INSTANCE_FORMAT_VALUE_NAME = "value"
 HG38_ENCODING = "HG38"
 HG38_PATH = "/sci/archive/michall/roeizucker/reference_genome/hg38.fa"
+if not os.path.exists(HG38_PATH):
+    HG38_PATH = "/home/users/roeizucker/tests/reference_genome/hg38.fa"
 RAW_INPUT_NAME = "raw_input"
 PREPROCESSED_INPUT_NAME = "pre_processed_input"
 INTERMEDIATE_INPUT_NAME = "intermediate_input"

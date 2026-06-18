@@ -5,15 +5,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, precision_s
 from utils.bigwig_utils import load_preprocessed_encode_cpg_dfs
 from utils.formatting import combine_cpg_dfs
 
-def evaluate_sample_predictions( 
-                                result_files_path, 
+def evaluate_sample_predictions(result_files_path, 
                                 chroms, 
                                 comparison_bigiwg_files,
                                 full_pos_name,
                                 ranges, 
                                 labels, 
-                                label_a, 
-                                label_b):
+                                comparison_types,
+                                all_two): #TODO: change all_two to something more generic
     compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
     eval_objects_dict = {}
 
@@ -21,33 +20,32 @@ def evaluate_sample_predictions(
         curr_result_eval = {}
         eval_objects_dict[result_file_path] = curr_result_eval
         new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
-        eval_object = create_eval_object(new_result_file,label_a,label_b,labels)
+        if all_two:
+            new_result_file["all_two"] = 2
+        comparison_types = comparison_types + ["all_two"]
+        eval_object = create_eval_object(new_result_file,comparison_types,labels)
         curr_result_eval["all_results"] = eval_object
     
     return eval_objects_dict
 
-def create_eval_object(new_result_file,label_a,label_b,labels):
+def create_eval_object(new_result_file,comparison_types,labels):
     eval_object = {}
-    eval_object[label_a + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_a]).to_dict()
-    eval_object[label_b + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_b]).to_dict()
-
-    types = [label_a,label_b]
-    for prediciton_type in types:
+    for prediciton_type in comparison_types:
         eval_object[prediciton_type] = {}
-
+        eval_object[prediciton_type + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[prediciton_type]).to_dict()
         for label in labels:
             eval_object[prediciton_type][label] = {}
             df = new_result_file.copy()
+            # TODO: make this generic
             df["specific_label"] = df["label"] == label
             df["specific_type_label"] = df[prediciton_type] == label
             precision = precision_score(df['specific_label'], df['specific_type_label'])
             recall = recall_score(df['specific_label'], df['specific_type_label'])
-
-            # print("\tclass",label)
             eval_object[prediciton_type][label]["Precision"] = precision
             eval_object[prediciton_type][label]["recall"] = recall
-            # print(f"\t\tPrecision: {precision:.2f}")
-            # print(f"\t\tRecall:    {recall:.2f}")
+    
+    df = new_result_file.copy()
+
     return eval_object
 
 def create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name):

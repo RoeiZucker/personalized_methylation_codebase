@@ -9,7 +9,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_DIR / "src"
 sys.path.insert(0, str(SRC_DIR))
 
-from evaluator import evaluate_sample_predictions
+from variability_free_evaluation import evaluate_sample_predictions
 
 
 RESULTS_DIR = Path("/sci/labs/michall/roeizucker/cls_downsample_liver")
@@ -31,8 +31,10 @@ RANGES = [0, 0.2, 0.8, 1]
 LABELS = [0, 1, 2]
 LABEL_A = "mean_label"
 LABEL_B = "predicted_class"
+COMPARISON_TYPES = [LABEL_A, LABEL_B]
+ALL_TWO = True
 NUMBER_OF_BINS = 5
-OUTPUT_PATH = PROJECT_DIR / "scripts" / "results" / "cls_downsample_liver_eval_objects_dict.txt"
+OUTPUT_PATH = PROJECT_DIR / "scripts" / "results" / "cls_downsample_liver_variability_free_eval_objects_dict.txt"
 
 
 def sample_name_from_result_path(result_file_path):
@@ -68,6 +70,7 @@ def main():
     eval_objects_dict = {}
 
     for sample_name, result_files_path in result_files_by_sample.items():
+        print(sample_name)
         chroms = get_chroms(result_files_path)
         comparison_bigiwg_files = [
             bigwig_file
@@ -76,16 +79,14 @@ def main():
         ]
 
         eval_objects_dict[sample_name] = evaluate_sample_predictions(
-            variability_file_path=str(variability_file_path(sample_name)),
             result_files_path=result_files_path,
             chroms=chroms,
             comparison_bigiwg_files=comparison_bigiwg_files,
             full_pos_name=FULL_POS_NAME,
             ranges=RANGES,
             labels=LABELS,
-            label_a=LABEL_A,
-            label_b=LABEL_B,
-            number_of_bins=NUMBER_OF_BINS,
+            comparison_types=COMPARISON_TYPES,
+            all_two=ALL_TWO,
         )
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
