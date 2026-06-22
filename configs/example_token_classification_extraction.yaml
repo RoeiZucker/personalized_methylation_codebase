@@ -20,7 +20,16 @@ task:
   use_fasta: true
   shuffle: true
   chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
   - chr5
+  - chr22
+  - chr21
+  - chr20
+  - chr19
+  - chr18
   tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
   output_preprocessed_data: false
   output_intermediate_data: true

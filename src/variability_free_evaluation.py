@@ -12,11 +12,13 @@ def evaluate_sample_predictions(result_files_path,
                                 ranges, 
                                 labels, 
                                 comparison_types,
-                                all_two): #TODO: change all_two to something more generic
+                                all_two,verbous=True): #TODO: change all_two to something more generic
     compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
     eval_objects_dict = {}
 
     for result_file_path in result_files_path:
+        if verbous:
+            print("curr result file",result_file_path,flush=True)
         curr_result_eval = {}
         eval_objects_dict[result_file_path] = curr_result_eval
         new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)

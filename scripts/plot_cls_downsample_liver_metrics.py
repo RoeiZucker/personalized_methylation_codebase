@@ -258,6 +258,66 @@ def plot_weighted_metric_lines(metrics, output_dir, dpi):
     plt.close(figure)
 
 
+def plot_weighted_f1_bar_by_variability_bin(metrics, output_dir, dpi):
+    weighted = metrics[metrics["class"] == "weighted"]
+    grouped = weighted.groupby(["method", "bin_rank"])["f1"]
+    plot_data = grouped.mean().reset_index().sort_values("bin_rank")
+    error_data = grouped.std().fillna(0)
+
+    bins = sorted(plot_data["bin_rank"].unique())
+    methods = [method for method in METHODS if method in plot_data["method"].unique()]
+    x = list(range(len(bins)))
+    width = min(0.8 / max(len(methods), 1), 0.35)
+    offsets = method_offsets(width, methods)
+
+    figure, axis = plt.subplots(figsize=(9, 4.5))
+    for method in methods:
+        method_data = plot_data[plot_data["method"] == method].set_index("bin_rank")
+        values = [method_data.loc[bin_rank, "f1"] if bin_rank in method_data.index else 0 for bin_rank in bins]
+        errors = [
+            error_data.loc[(method, bin_rank)]
+            if (method, bin_rank) in error_data.index
+            else 0
+            for bin_rank in bins
+        ]
+        positions = [value + offsets[method] for value in x]
+        axis.bar(
+            positions,
+            values,
+            width=width,
+            yerr=errors,
+            capsize=4,
+            error_kw={"elinewidth": 1, "capthick": 1},
+            label=method.replace("_", " " ).title(),
+        )
+        for position, value, error in zip(positions, values, errors):
+            axis.text(
+                position,
+                min(value + error + 0.015, 1.06),
+                f"{value:.2f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    axis.set_xticks(x)
+    axis.set_xticklabels([f"Bin {bin_rank}" for bin_rank in bins])
+    axis.set_ylim(0, 1.1)
+    axis.set_ylabel("Mean weighted F1 (+/- SD)")
+    axis.set_xlabel("Variability bin")
+    axis.set_title("Weighted F1 by variability bin")
+    axis.grid(axis="y", alpha=0.3)
+    axis.legend(loc="lower right")
+    figure.tight_layout()
+    figure.savefig(
+        output_dir / "weighted_f1_bar_by_variability_bin.png",
+        dpi=dpi,
+        bbox_inches="tight",
+        pad_inches=0.15,
+    )
+    plt.close(figure)
+
+
 def plot_non_weighted_metric_lines(metrics, output_dir, dpi):
     class_metrics = metrics[metrics["class"] != "weighted"]
     plot_data = (
@@ -580,6 +640,79 @@ def plot_all_results_confusion_matrices(data, output_dir, dpi):
     plt.close(figure)
 
 
+def plot_variability_bin_class_metric_grid(metrics, output_dir, dpi):
+    class_metrics = metrics[metrics["class"] != "weighted"]
+    grouped = class_metrics.groupby(["bin_rank", "class", "method"])[
+        ["precision", "recall", "f1"]
+    ]
+    plot_data = grouped.mean().reset_index()
+    error_data = grouped.std().fillna(0)
+
+    bins = (
+        plot_data[["bin_rank"]]
+        .drop_duplicates()
+        .sort_values("bin_rank")
+    )
+    classes = sorted(plot_data["class"].unique(), key=class_sort_key)
+    methods = [method for method in METHODS if method in plot_data["method"].unique()]
+    metric_names = ["f1", "precision", "recall"]
+
+    x = list(range(len(classes)))
+    width = min(0.8 / max(len(methods), 1), 0.35)
+    offsets = method_offsets(width, methods)
+    figure, axes = plt.subplots(
+        len(bins),
+        len(metric_names),
+        figsize=(4.8 * len(metric_names), 2.9 * len(bins)),
+        sharey=True,
+        squeeze=False,
+    )
+
+    for row, bin_info in enumerate(bins.itertuples(index=False)):
+        bin_data = plot_data[plot_data["bin_rank"] == bin_info.bin_rank]
+        for col, metric in enumerate(metric_names):
+            axis = axes[row, col]
+            for method in methods:
+                method_data = bin_data[bin_data["method"] == method].set_index("class")
+                values = [method_data.loc[class_id, metric] if class_id in method_data.index else 0 for class_id in classes]
+                errors = [
+                    error_data.loc[(bin_info.bin_rank, class_id, method), metric]
+                    if (bin_info.bin_rank, class_id, method) in error_data.index
+                    else 0
+                    for class_id in classes
+                ]
+                positions = [value + offsets[method] for value in x]
+                axis.bar(
+                    positions,
+                    values,
+                    width=width,
+                    yerr=errors,
+                    capsize=3,
+                    error_kw={"elinewidth": 1, "capthick": 1},
+                    label=method.replace("_", " " ).title(),
+                )
+            if row == 0:
+                axis.set_title(metric.title())
+            if col == 0:
+                axis.set_ylabel(f"Variability bin {bin_info.bin_rank}")
+            axis.set_xticks(x)
+            axis.set_xticklabels([f"Class {class_id}" for class_id in classes])
+            axis.set_ylim(0, 1.1)
+            axis.grid(axis="y", alpha=0.3)
+
+    handles, labels = axes[0, -1].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="upper center", ncol=max(len(methods), 1))
+    figure.suptitle("Class metrics by variability bin", y=0.995)
+    figure.tight_layout(rect=(0, 0, 1, 0.965))
+    figure.savefig(
+        output_dir / "class_metrics_by_variability_bin_grid.png",
+        dpi=dpi,
+        bbox_inches="tight",
+        pad_inches=0.15,
+    )
+    plt.close(figure)
+
+
 def plot_sample_weighted_f1(metrics, output_dir, dpi):
     weighted = metrics[metrics["class"] == "weighted"]
     samples = sorted(weighted["sample"].unique())
@@ -665,9 +798,11 @@ def main():
     else:
         metrics.to_csv(args.output_dir / "metrics.csv", index=False)
         plot_weighted_metric_lines(metrics, args.output_dir, args.dpi)
+        plot_weighted_f1_bar_by_variability_bin(metrics, args.output_dir, args.dpi)
         plot_non_weighted_metric_lines(metrics, args.output_dir, args.dpi)
         plot_sample_non_weighted_metric_lines(metrics, args.output_dir, args.dpi)
         plot_per_class_metric_lines(metrics, args.output_dir, args.dpi)
+        plot_variability_bin_class_metric_grid(metrics, args.output_dir, args.dpi)
         plot_sample_weighted_f1(metrics, args.output_dir, args.dpi)
         plot_class_f1_heatmaps(metrics, args.output_dir, args.dpi)
 
