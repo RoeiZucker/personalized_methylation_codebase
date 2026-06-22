@@ -9,7 +9,7 @@ import yaml
 
 NO_PRETRAINING_CONFIG_NAME = "no_pretraining"
 DEFAULT_OUTPUT_FILENAME = "eval_predictions.csv.gitbackup"
-DEFAULT_PYTHON_COMMAND = "/home/users/roeizucker/tests/my_env/bin/python"
+DEFAULT_RUNNER_COMMAND = "bash"
 DEFAULT_SBATCH_PREFIX = (
     "sbatch --container-mounts=/shared:/shared --partition=compute-gpu "
     "--qos=owner_95 --gres=gpu:1 --time=95:10:00 "
@@ -26,7 +26,7 @@ def _default_repo_root():
 
 
 REPO_ROOT = _default_repo_root()
-DEFAULT_RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run_pretrain_checkpoint_prediction.py"
+DEFAULT_RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run_pretrain_checkpoint_prediction_params_prod.sh"
 
 
 def _load_yaml(path):
@@ -130,7 +130,7 @@ def create_pretrain_prediction_commands(
     project_dir,
     output_base_dir=None,
     runner_script=DEFAULT_RUNNER_SCRIPT,
-    python_command=DEFAULT_PYTHON_COMMAND,
+    python_command=DEFAULT_RUNNER_COMMAND,
     checkpoint_prefix="epoch-",
     output_filename=DEFAULT_OUTPUT_FILENAME,
     overwrite=False,
@@ -210,7 +210,11 @@ def parse_args():
         help="Optional base directory for prediction outputs. Defaults to the model project directory.",
     )
     parser.add_argument("--runner-script", default=str(DEFAULT_RUNNER_SCRIPT))
-    parser.add_argument("--python-command", default=DEFAULT_PYTHON_COMMAND)
+    parser.add_argument(
+        "--python-command",
+        default=DEFAULT_RUNNER_COMMAND,
+        help="Command used to execute the runner script. Default is bash for the prod wrapper.",
+    )
     parser.add_argument("--checkpoint-prefix", default="epoch-")
     parser.add_argument("--output-filename", default=DEFAULT_OUTPUT_FILENAME)
     parser.add_argument("--overwrite", action="store_true")
