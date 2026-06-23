@@ -170,9 +170,13 @@ def evaluate_sample_predictions(variability_file_path,
                                 labels, 
                                 label_a, 
                                 label_b, 
-                                number_of_bins):
+                                number_of_bins,
+                                comparison_dicts=None):
     variability_file = pd.read_csv(variability_file_path)
-    compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
+    if comparison_dicts is None:
+        compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
+    else:
+        compare_dicts = comparison_dicts
     eval_objects_dict = {}
 
     for result_file_path in result_files_path:

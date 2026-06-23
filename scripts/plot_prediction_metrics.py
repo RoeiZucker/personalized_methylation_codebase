@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot metrics from cls_downsample_liver eval_objects_dict output."""
+"""Plot metrics from grouped eval_objects_dict output."""
 
 import argparse
 import ast
@@ -29,14 +29,19 @@ def parse_args():
         type=Path,
         default=Path(__file__).resolve().parent
         / "results"
-        / "cls_downsample_liver_eval_objects_dict.txt",
+        / "eval_objects_dict.txt",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(__file__).resolve().parent / "results" / "cls_downsample_liver_plots",
+        default=Path(__file__).resolve().parent / "results" / "prediction_metric_plots",
     )
     parser.add_argument("--dpi", type=int, default=200)
+    parser.add_argument(
+        "--final-epoch-only",
+        action="store_true",
+        help="For each sample, keep only the highest retraining epoch prediction file.",
+    )
     return parser.parse_args()
 
 
@@ -83,6 +88,22 @@ def class_support(confusion, class_id):
         float(value_for_class(predicted_counts, class_id))
         for predicted_counts in confusion.values()
     )
+
+
+def filter_final_epoch_per_sample(data):
+    filtered = {}
+    for sample, sample_results in data.items():
+        best_path = None
+        best_key = (-1, -1)
+        for path in sample_results:
+            epoch, step = checkpoint_from_path(path)
+            key = (epoch if epoch is not None else -1, step if step is not None else -1)
+            if key > best_key:
+                best_key = key
+                best_path = path
+        if best_path is not None:
+            filtered[sample] = {best_path: sample_results[best_path]}
+    return filtered
 
 
 def rows_for_result(sample, path, bin_rank, bin_key, result):
@@ -785,6 +806,8 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_data(args.input_file)
+    if args.final_epoch_only:
+        data = filter_final_epoch_per_sample(data)
     all_metrics = extract_all_results_metrics(data)
     all_metrics.to_csv(args.output_dir / "all_results_metrics.csv", index=False)
     plot_all_results_class_metrics(all_metrics, args.output_dir, args.dpi)

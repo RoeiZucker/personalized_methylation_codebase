@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 from pprint import pformat
+import pickle
 import re
 import sys
 
@@ -14,28 +15,23 @@ sys.path.insert(0, str(SRC_DIR))
 
 from evaluator import evaluate_sample_predictions as evaluate_with_variability
 from variability_free_evaluation import evaluate_sample_predictions as evaluate_variability_free
+from create_comparison_dicts import discover_bigwig_files_by_sample, read_bigwig_map_file
 
 
 RESULTS_DIR = Path("/sci/labs/michall/roeizucker/cls_downsample_liver")
-OUTPUT_ROOT = PROJECT_DIR / "scripts" / "results" / "cls_downsample_liver_grouped_evaluations"
-VARIABILITY_DIR = Path(
-    "/sci/labs/michall/roeizucker/huggingface_datasets_dir/"
-    "huggingface_datasets_dir/_Liver-Hepatocytes_kmer"
-)
-BIGWIG_FILES_BY_SAMPLE = {
-    "Z000000R3": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652233_Liver-Hepatocytes-Z000000R3.hg38.bigwig",
-    "Z000000T3": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652234_Liver-Hepatocytes-Z000000T3.hg38.bigwig",
-    "Z0000043Q": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652235_Liver-Hepatocytes-Z0000043Q.hg38.bigwig",
-    "Z0000044H": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652236_Liver-Hepatocytes-Z0000044H.hg38.bigwig",
-    "Z0000044M": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652237_Liver-Hepatocytes-Z0000044M.hg38.bigwig",
-    "Z00000431": "/sci/archive/michall/roeizucker/downloaded_datasets/GSM5652238_Liver-Hepatocytes-Z00000431.hg38.bigwig",
-}
+OUTPUT_ROOT = PROJECT_DIR / "scripts" / "results" / "grouped_evaluations"
+DATASETS_DIR = Path("/sci/archive/michall/roeizucker/downloaded_datasets")
+HF_DATASETS_ROOT = Path("/sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir")
+DEFAULT_TISSUE_NAME = "Liver-Hepatocytes"
 
 GROUPS = {
     "no_pretraining": re.compile(r"^[^_]+_no_pretraining_retrain_"),
     "epoch_1_pretraining": re.compile(r"^[^_]+_epoch-1-step-\d+_retrain_"),
     "epoch_2_pretraining": re.compile(r"^[^_]+_epoch-2-step-\d+_retrain_"),
     "epoch_3_pretraining": re.compile(r"^[^_]+_epoch-3-step-\d+_retrain_"),
+    "first_phase_epoch_1": re.compile(r"^[^_]+_epoch-1-step-\d+_pretrain_prediction$"),
+    "first_phase_epoch_2": re.compile(r"^[^_]+_epoch-2-step-\d+_pretrain_prediction$"),
+    "first_phase_epoch_3": re.compile(r"^[^_]+_epoch-3-step-\d+_pretrain_prediction$"),
 }
 
 FULL_POS_NAME = "full_pos"
@@ -60,8 +56,13 @@ def parse_args():
     )
     parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
+    parser.add_argument("--tissue-name", default=DEFAULT_TISSUE_NAME)
+    parser.add_argument("--datasets-dir", type=Path, default=DATASETS_DIR)
+    parser.add_argument("--bigwig-map-file", type=Path, default=None)
+    parser.add_argument("--variability-dir", type=Path, default=None)
     parser.add_argument("--batch-size", default="14")
     parser.add_argument("--number-of-bins", type=int, default=5)
+    parser.add_argument("--comparison-dicts-dir", type=Path, default=None)
     parser.add_argument("--all-two", action="store_true", default=True)
     return parser.parse_args()
 
@@ -78,10 +79,12 @@ def group_name_from_run_dir(run_dir_name):
     return None
 
 
-def variability_file_path(sample_name):
+def variability_file_path(sample_name, tissue_name, variability_dir):
+    if variability_dir is None:
+        variability_dir = HF_DATASETS_ROOT / f"_{tissue_name}_kmer"
     return (
-        VARIABILITY_DIR
-        / f"{sample_name}_per_varaint_variability_Liver-Hepatocytes_kmer_seq_5400_datasets.csv"
+        variability_dir
+        / f"{sample_name}_per_varaint_variability_{tissue_name}_kmer_seq_5400_datasets.csv"
     )
 
 
@@ -97,22 +100,37 @@ def discover_grouped_result_files(results_dir, batch_size, pretraining_group):
     result_files_by_sample = {}
     for result_file_path in sorted(results_dir.glob("*/epoch-*/eval_predictions.csv.gitbackup")):
         run_dir_name = result_file_path.parents[1].name
-        if f"_bs_{batch_size}_" not in run_dir_name:
+        group_name = group_name_from_run_dir(run_dir_name)
+        if group_name != pretraining_group:
             continue
-        if group_name_from_run_dir(run_dir_name) != pretraining_group:
+        if not pretraining_group.startswith("first_phase_") and f"_bs_{batch_size}_" not in run_dir_name:
             continue
         sample_name = sample_name_from_result_path(result_file_path)
         result_files_by_sample.setdefault(sample_name, []).append(str(result_file_path))
     return result_files_by_sample
 
 
-def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_two):
+def load_comparison_dicts(comparison_dicts_dir, sample_name):
+    if comparison_dicts_dir is None:
+        return None
+    path = comparison_dicts_dir / f"{sample_name}_comparison_dicts.pkl"
+    if not path.exists():
+        raise FileNotFoundError(f"Missing comparison dict cache for {sample_name}: {path}")
+    with path.open("rb") as handle:
+        payload = pickle.load(handle)
+    if isinstance(payload, dict) and "compare_dicts" in payload:
+        return payload["compare_dicts"]
+    return payload
+
+
+def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_two, comparison_dicts_dir, bigwig_files_by_sample, tissue_name, variability_dir):
     chroms = get_chroms(result_files_path)
     comparison_bigwig_files = [
         bigwig_file
-        for curr_sample, bigwig_file in BIGWIG_FILES_BY_SAMPLE.items()
+        for curr_sample, bigwig_file in bigwig_files_by_sample.items()
         if curr_sample != sample_name
     ]
+    comparison_dicts = load_comparison_dicts(comparison_dicts_dir, sample_name)
 
     if mode == "variability_free":
         return evaluate_variability_free(
@@ -124,10 +142,11 @@ def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_tw
             labels=LABELS,
             comparison_types=COMPARISON_TYPES,
             all_two=all_two,
+            comparison_dicts=comparison_dicts,
         )
 
     return evaluate_with_variability(
-        variability_file_path=str(variability_file_path(sample_name)),
+        variability_file_path=str(variability_file_path(sample_name, tissue_name, variability_dir)),
         result_files_path=result_files_path,
         chroms=chroms,
         comparison_bigiwg_files=comparison_bigwig_files,
@@ -137,6 +156,7 @@ def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_tw
         label_a=LABEL_A,
         label_b=LABEL_B,
         number_of_bins=number_of_bins,
+        comparison_dicts=comparison_dicts,
     )
 
 
@@ -152,6 +172,15 @@ def main():
             f"No result files found for group={args.pretraining_group}, bs={args.batch_size}"
         )
 
+    if args.bigwig_map_file is not None:
+        bigwig_files_by_sample = read_bigwig_map_file(args.bigwig_map_file)
+    else:
+        bigwig_files_by_sample = discover_bigwig_files_by_sample(args.tissue_name, args.datasets_dir)
+    if not bigwig_files_by_sample and args.comparison_dicts_dir is None:
+        raise ValueError(
+            "No bigwig files found. Pass --bigwig-map-file or --comparison-dicts-dir."
+        )
+
     eval_objects_dict = {}
     for sample_name, result_files_path in sorted(result_files_by_sample.items()):
         print(
@@ -165,6 +194,10 @@ def main():
             mode=args.mode,
             number_of_bins=args.number_of_bins,
             all_two=args.all_two,
+            comparison_dicts_dir=args.comparison_dicts_dir,
+            bigwig_files_by_sample=bigwig_files_by_sample,
+            tissue_name=args.tissue_name,
+            variability_dir=args.variability_dir,
         )
 
     output_dir = args.output_root / args.mode / args.pretraining_group

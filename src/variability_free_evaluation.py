@@ -12,8 +12,13 @@ def evaluate_sample_predictions(result_files_path,
                                 ranges, 
                                 labels, 
                                 comparison_types,
-                                all_two,verbous=True): #TODO: change all_two to something more generic
-    compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
+                                all_two,
+                                verbous=True,
+                                comparison_dicts=None): #TODO: change all_two to something more generic
+    if comparison_dicts is None:
+        compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
+    else:
+        compare_dicts = comparison_dicts
     eval_objects_dict = {}
 
     for result_file_path in result_files_path:
@@ -24,8 +29,10 @@ def evaluate_sample_predictions(result_files_path,
         new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
         if all_two:
             new_result_file["all_two"] = 2
-        comparison_types = comparison_types + ["all_two"]
-        eval_object = create_eval_object(new_result_file,comparison_types,labels)
+        curr_comparison_types = list(comparison_types)
+        if all_two and "all_two" not in curr_comparison_types:
+            curr_comparison_types.append("all_two")
+        eval_object = create_eval_object(new_result_file,curr_comparison_types,labels)
         curr_result_eval["all_results"] = eval_object
     
     return eval_objects_dict
