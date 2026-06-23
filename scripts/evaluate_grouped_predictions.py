@@ -136,7 +136,7 @@ def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_tw
         return evaluate_variability_free(
             result_files_path=result_files_path,
             chroms=chroms,
-            comparison_bigiwg_files=comparison_bigwig_files,
+            comparison_bigwig_files=comparison_bigwig_files,
             full_pos_name=FULL_POS_NAME,
             ranges=RANGES,
             labels=LABELS,
@@ -149,7 +149,7 @@ def evaluate_sample(sample_name, result_files_path, mode, number_of_bins, all_tw
         variability_file_path=str(variability_file_path(sample_name, tissue_name, variability_dir)),
         result_files_path=result_files_path,
         chroms=chroms,
-        comparison_bigiwg_files=comparison_bigwig_files,
+        comparison_bigwig_files=comparison_bigwig_files,
         full_pos_name=FULL_POS_NAME,
         ranges=RANGES,
         labels=LABELS,

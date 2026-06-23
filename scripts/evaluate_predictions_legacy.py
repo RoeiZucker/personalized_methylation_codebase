@@ -72,7 +72,7 @@ def main():
     for sample_name, result_files_path in result_files_by_sample.items():
         print(sample_name)
         chroms = get_chroms(result_files_path)
-        comparison_bigiwg_files = [
+        comparison_bigwig_files = [
             bigwig_file
             for curr_sample, bigwig_file in BIGWIG_FILES_BY_SAMPLE.items()
             if curr_sample != sample_name
@@ -81,7 +81,7 @@ def main():
         eval_objects_dict[sample_name] = evaluate_sample_predictions(
             result_files_path=result_files_path,
             chroms=chroms,
-            comparison_bigiwg_files=comparison_bigiwg_files,
+            comparison_bigwig_files=comparison_bigwig_files,
             full_pos_name=FULL_POS_NAME,
             ranges=RANGES,
             labels=LABELS,

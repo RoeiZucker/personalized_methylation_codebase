@@ -14,6 +14,20 @@ from scipy.stats import pearsonr
 from constants import (
     CPG_EVALUATION_TASK_TYPE
 )
+try:
+    from .variability_free_evaluation import (
+        apply_create_labels as variability_free_apply_create_labels,
+        apply_create_means as variability_free_apply_create_means,
+        create_result_file_mean_label as variability_free_create_result_file_mean_label,
+        create_result_file_mean_value as variability_free_create_result_file_mean_value,
+    )
+except ImportError:
+    from variability_free_evaluation import (
+        apply_create_labels as variability_free_apply_create_labels,
+        apply_create_means as variability_free_apply_create_means,
+        create_result_file_mean_label as variability_free_create_result_file_mean_label,
+        create_result_file_mean_value as variability_free_create_result_file_mean_value,
+    )
 class _SimpleMetric:
     def __init__(self, func, key):
         self.func = func
@@ -161,20 +175,29 @@ PREDICTION_SUMMARY_COLUMNS = [
     "n_positions_mean",
 ]
 
-def evaluate_sample_predictions(variability_file_path, 
-                                result_files_path, 
-                                chroms, 
-                                comparison_bigiwg_files,
-                                full_pos_name,
-                                ranges, 
-                                labels, 
-                                label_a, 
-                                label_b, 
-                                number_of_bins,
-                                comparison_dicts=None):
+def evaluate_sample_predictions(variability_file_path,
+                                result_files_path,
+                                chroms,
+                                comparison_bigwig_files=None,
+                                full_pos_name=None,
+                                ranges=None,
+                                labels=None,
+                                label_a=None,
+                                label_b=None,
+                                number_of_bins=None,
+                                comparison_dicts=None,
+                                **legacy_kwargs):
+    if "comparison_bigiwg_files" in legacy_kwargs:
+        if comparison_bigwig_files is not None:
+            raise TypeError("Pass only one of comparison_bigwig_files or comparison_bigiwg_files")
+        comparison_bigwig_files = legacy_kwargs.pop("comparison_bigiwg_files")
+    if legacy_kwargs:
+        unexpected = ", ".join(sorted(legacy_kwargs))
+        raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
+
     variability_file = pd.read_csv(variability_file_path)
     if comparison_dicts is None:
-        compare_dicts = create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name)
+        compare_dicts = create_comparison_dicts(comparison_bigwig_files,chroms,full_pos_name)
     else:
         compare_dicts = comparison_dicts
     eval_objects_dict = {}
@@ -185,7 +208,7 @@ def evaluate_sample_predictions(variability_file_path,
         new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
         eval_object = create_eval_object(new_result_file,label_a,label_b,labels)
         curr_result_eval["all_results"] = eval_object
-    
+
         std_max = variability_file["std"].max()
         target = number_of_bins
         new_result_file["full_position"] = new_result_file["chrom"] + ":" + new_result_file["genomic_position"].astype(str) + "-"+ (new_result_file["genomic_position"] + 2).astype(str)
@@ -201,31 +224,25 @@ def evaluate_sample_predictions(variability_file_path,
 
 def create_eval_object(new_result_file,label_a,label_b,labels):
     eval_object = {}
-    eval_object[label_a + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_a]).to_dict()
-    eval_object[label_b + "_confusion_matrix"] = pd.crosstab(new_result_file['label'], new_result_file[label_b]).to_dict()
-
-    types = [label_a,label_b]
-    for prediciton_type in types:
-        eval_object[prediciton_type] = {}
-
+    true_labels = new_result_file["label"]
+    for prediction_type in [label_a,label_b]:
+        predicted_labels = new_result_file[prediction_type]
+        eval_object[prediction_type + "_confusion_matrix"] = pd.crosstab(true_labels, predicted_labels).to_dict()
+        eval_object[prediction_type] = {}
         for label in labels:
-            eval_object[prediciton_type][label] = {}
-            df = new_result_file.copy()
-            df["specific_label"] = df["label"] == label
-            df["specific_type_label"] = df[prediciton_type] == label
-            precision = precision_score(df['specific_label'], df['specific_type_label'])
-            recall = recall_score(df['specific_label'], df['specific_type_label'])
-
-            # print("\tclass",label)
-            eval_object[prediciton_type][label]["Precision"] = precision
-            eval_object[prediciton_type][label]["recall"] = recall
-            # print(f"\t\tPrecision: {precision:.2f}")
-            # print(f"\t\tRecall:    {recall:.2f}")
+            specific_label = true_labels == label
+            specific_type_label = predicted_labels == label
+            precision = precision_score(specific_label, specific_type_label, zero_division=0)
+            recall = recall_score(specific_label, specific_type_label, zero_division=0)
+            eval_object[prediction_type][label] = {
+                "Precision": precision,
+                "recall": recall,
+            }
     return eval_object
 
-def create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name):
+def create_comparison_dicts(comparison_bigwig_files,chroms,full_pos_name):
     labels = []
-    comparison_dfs = load_preprocessed_encode_cpg_dfs(comparison_bigiwg_files,chroms,full_pos_name,False)
+    comparison_dfs = load_preprocessed_encode_cpg_dfs(comparison_bigwig_files,chroms,full_pos_name,False)
     for i in range(len(comparison_dfs)):
         labels.append(f"ind_{i}")
     combined_compare_df = combine_cpg_dfs(full_pos_name,comparison_dfs,labels)
@@ -235,40 +252,19 @@ def create_comparison_dicts(comparison_bigiwg_files,chroms,full_pos_name):
     return compare_dicts
 
 def apply_create_means(row,compare_dicts):
-    values = []
-    genomic_position = row["genomic_position"]
-    chrom = row["chrom"]
-    for i in range(genomic_position - 1,genomic_position+6):
-        if i in compare_dicts[chrom]:
-            temp_values = []
-            for key in compare_dicts[chrom][i]:
-                if "methyl_rate_ind" in key:
-                    temp_values.append(compare_dicts[chrom][i][key])
-            values.append(np.mean(temp_values))
-    if len(values) == 0:
-        return None
-    return np.mean(values)
+    return variability_free_apply_create_means(row,compare_dicts)
 
 
 def apply_create_labels(row,ranges):
-    mean_value = row["mean_value"]
-    for i in range(len(ranges) - 1):
-        if ranges[i] <= mean_value and mean_value <= ranges[i+1]:
-            return i
+    return variability_free_apply_create_labels(row,ranges)
 
 
 def create_result_file_mean_label(result_file_path, compare_dicts,ranges):
-    result_file = create_result_file_mean_value(result_file_path, compare_dicts)
-    new_result_file = result_file.dropna().copy()
-    new_result_file["mean_label"] =  new_result_file.apply(lambda x: apply_create_labels(x,ranges),axis=1)
-    return new_result_file
+    return variability_free_create_result_file_mean_label(result_file_path, compare_dicts,ranges)
+
 
 def create_result_file_mean_value(result_file_path, compare_dicts):
-    result_file = pd.read_csv(result_file_path)
-    result_file["label"] = result_file["label"].astype(int)
-    result_file["chrom"] = result_file["window_id"].str.split(":").str[0]
-    result_file["mean_value"] = result_file.apply(lambda x: apply_create_means(x,compare_dicts),axis=1)
-    return result_file
+    return variability_free_create_result_file_mean_value(result_file_path, compare_dicts)
 
 def create_window_id_dataset_dict(dataset,existing_keys = None):
     keys = []
@@ -1279,10 +1275,10 @@ def add_std_bins_to_dataframe(number_of_bins, variant_file_dataframe):
                  # include 0 in first bin
             )
 
-def create_dataset_labels(selected_dataset, variability_positions_dict, bins_to_use,verbous):
+def create_dataset_labels(selected_dataset, variability_positions_dict, bins_to_use,verbose):
     dataset_labels = {}
     for dataset_index in range(len(selected_dataset)):
-        if verbous:
+        if verbose:
             if dataset_index % 500 == 0:
                 print("creating dataset labels",dataset_index,"/",len(selected_dataset),end="\r",flush=True)
         curr_window_id =selected_dataset[dataset_index]["window_id"]
@@ -1295,7 +1291,7 @@ def create_dataset_labels(selected_dataset, variability_positions_dict, bins_to_
                 # add +1 to labels position because first token is for entire sequence, so all needs to be shifted
             filtered_labels_from_dataset = [ selected_dataset[dataset_index]["labels"][i + 1] for i in viable_positions]   
             dataset_labels[curr_window_id][curr_bin] = filtered_labels_from_dataset
-    if verbous:
+    if verbose:
         print("\n")
     return dataset_labels
 
