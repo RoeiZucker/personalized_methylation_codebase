@@ -882,7 +882,7 @@ def change_base_dict_to_training_dict(base_dict, tokenizer_name, name_suffix, ba
         per_device_train_batch_size, per_device_eval_batch_size, learning_rate, metric_for_best_model, save_stratagy, 
         add_epoch_end_save_callback, save_at_end, continue_from_last, curr_base_name, 
         train_dataset_path,number_of_steps = None, save_total_limit = None,trained_model_path=None,top_rows = -1,
-        max_grad_norm = None,lora_over_finetuned=False,load_dataset_to_memory=False,min_number_of_cpg_sites=-1,OVERRITE_BATCH_SIZE=None,add_epoch_end_prediction=True,eval_dataset_path=None):
+        max_grad_norm = None,lora_over_finetuned=False,load_dataset_to_memory=False,min_number_of_cpg_sites=-1,OVERRITE_BATCH_SIZE=None,add_epoch_end_prediction=True,eval_dataset_path=None,wandb_config=None):
     base_dict["paths"]["train_dataset_path"] = train_dataset_path
     base_dict["paths"]["output_dir"] = os.path.join(base_model_location,curr_base_name + name_suffix)
     if trained_model_path is not None:
@@ -928,7 +928,8 @@ def change_base_dict_to_training_dict(base_dict, tokenizer_name, name_suffix, ba
     base_dict["train"]["add_epoch_end_prediction"] = add_epoch_end_prediction
     base_dict["train"]["save_at_end"] = save_at_end
     base_dict["train"]["continue_from_last"] = continue_from_last
-
+    if wandb_config is not None:
+        base_dict["wandb"] = wandb_config
 
 
 def create_project_config(project_suffix, bigwig_files, names, created_configs_path, tokenizer_name, dataset_base_dir, 

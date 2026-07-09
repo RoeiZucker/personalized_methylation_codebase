@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Examples:
+#   python3 scripts/plot_group_comparison.py --input-root scripts/results/grouped_evaluations/variability_free --output-dir scripts/results/grouped_evaluations/variability_free/comparison_plots
+#   python3 scripts/plot_group_comparison.py --input-root scripts/results/grouped_evaluations/variability_free --output-dir scripts/results/grouped_evaluations/variability_free/comparison_plots_no_all_two --exclude-method all_two
+#   python3 scripts/plot_group_comparison.py --input-root scripts/results/grouped_evaluations/variability_bins --output-dir scripts/results/grouped_evaluations/variability_bins/comparison_plots --variability-bins
 from argparse import ArgumentParser
 from pathlib import Path
 import ast
@@ -21,22 +25,46 @@ GROUP_ORDER = [
     "first_phase_epoch_1",
     "first_phase_epoch_2",
     "first_phase_epoch_3",
+    "first_phase_epoch_4",
+    "first_phase_epoch_5",
+    "first_phase_epoch_6",
     "epoch_1_pretraining",
     "epoch_2_pretraining",
     "epoch_3_pretraining",
+    "epoch_4_pretraining",
+    "epoch_5_pretraining",
+    "epoch_6_pretraining",
 ]
 GROUP_LABELS = {
     "no_pretraining": "No pretrain",
     "first_phase_epoch_1": "Pretrain E1",
     "first_phase_epoch_2": "Pretrain E2",
     "first_phase_epoch_3": "Pretrain E3",
+    "first_phase_epoch_4": "Pretrain E4",
+    "first_phase_epoch_5": "Pretrain E5",
+    "first_phase_epoch_6": "Pretrain E6",
     "epoch_1_pretraining": "Retrain E1",
     "epoch_2_pretraining": "Retrain E2",
     "epoch_3_pretraining": "Retrain E3",
+    "epoch_4_pretraining": "Retrain E4",
+    "epoch_5_pretraining": "Retrain E5",
+    "epoch_6_pretraining": "Retrain E6",
 }
 METHODS = ["predicted_class", "mean_label", "all_two"]
 EPOCH_RE = re.compile(r"/epoch-(\d+)-step-\d+/")
 BIN_RE = re.compile(r"^(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)-(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$")
+
+
+def group_label(group):
+    if group in GROUP_LABELS:
+        return GROUP_LABELS[group]
+    match = re.fullmatch(r"first_phase_epoch_(\d+)", group)
+    if match is not None:
+        return f"Pretrain E{int(match.group(1))}"
+    match = re.fullmatch(r"epoch_(\d+)_pretraining", group)
+    if match is not None:
+        return f"Retrain E{int(match.group(1))}"
+    return group
 
 
 def parse_args():
@@ -50,7 +78,47 @@ def parse_args():
     parser.add_argument("--dpi", type=int, default=200)
     parser.add_argument("--final-only", action="store_true")
     parser.add_argument("--variability-bins", action="store_true")
+    parser.add_argument(
+        "--group",
+        action="append",
+        dest="groups",
+        default=[],
+        help="Group directory to include. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--groups",
+        default=None,
+        help="Comma-separated group directories to include, in plot order.",
+    )
+    parser.add_argument(
+        "--methods",
+        default=None,
+        help="Comma-separated methods to plot. Defaults to every available method.",
+    )
+    parser.add_argument(
+        "--exclude-method",
+        action="append",
+        default=[],
+        help="Method to exclude from plots and the output metrics CSV. Can be passed multiple times.",
+    )
     return parser.parse_args()
+
+
+def parse_groups(args):
+    groups = list(args.groups)
+    if args.groups:
+        groups.extend(group.strip() for group in args.groups.split(",") if group.strip())
+    return groups or GROUP_ORDER
+
+
+def parse_methods(args, metrics):
+    available_methods = [method for method in METHODS if method in set(metrics["method"])]
+    if args.methods:
+        requested_methods = [method.strip() for method in args.methods.split(",") if method.strip()]
+    else:
+        requested_methods = available_methods
+    excluded_methods = set(args.exclude_method)
+    return [method for method in requested_methods if method in available_methods and method not in excluded_methods]
 
 
 def f1_score(precision, recall):
@@ -107,7 +175,7 @@ def rows_for_result(group, sample, result_path, result, bin_rank=None, bin_label
             recall = float(values["recall"])
             row = {
                 "group": group,
-                "group_label": GROUP_LABELS.get(group, group),
+                "group_label": group_label(group),
                 "sample": sample,
                 "result_path": result_path,
                 "epoch": epoch_num(result_path),
@@ -128,7 +196,7 @@ def rows_for_result(group, sample, result_path, result, bin_rank=None, bin_label
             rows.append(
                 {
                     "group": group,
-                    "group_label": GROUP_LABELS.get(group, group),
+                    "group_label": group_label(group),
                     "sample": sample,
                     "result_path": result_path,
                     "epoch": epoch_num(result_path),
@@ -175,22 +243,22 @@ def load_group_rows(input_root, group, final_only, variability_bins):
     return rows
 
 
-def load_metrics(input_root, final_only, variability_bins):
+def load_metrics(input_root, final_only, variability_bins, groups):
     rows = []
-    for group in GROUP_ORDER:
+    for group in groups:
         rows.extend(load_group_rows(input_root, group, final_only, variability_bins))
     if not rows:
         raise ValueError(f"No eval_objects_dict.txt files found under {input_root}")
     return pd.DataFrame(rows)
 
 
-def plot_weighted_metrics(metrics, output_dir, dpi):
+def plot_weighted_metrics(metrics, output_dir, dpi, groups, methods):
     weighted = metrics[metrics["class"] == "weighted"]
     grouped = weighted.groupby(["group", "group_label", "method"])[["precision", "recall", "f1"]]
     mean_data = grouped.mean().reset_index()
     std_data = grouped.std().fillna(0)
-    present_groups = [group for group in GROUP_ORDER if group in mean_data["group"].unique()]
-    methods = [method for method in METHODS if method in mean_data["method"].unique()]
+    present_groups = [group for group in groups if group in mean_data["group"].unique()]
+    methods = [method for method in methods if method in mean_data["method"].unique()]
     metrics_to_plot = ["f1", "precision", "recall"]
     x = list(range(len(present_groups)))
     width = min(0.8 / max(len(methods), 1), 0.28)
@@ -202,8 +270,8 @@ def plot_weighted_metrics(metrics, output_dir, dpi):
             method_data = mean_data[mean_data["method"] == method].set_index("group")
             values = [method_data.loc[group, metric] if group in method_data.index else 0 for group in present_groups]
             errors = [
-                std_data.loc[(group, GROUP_LABELS.get(group, group), method), metric]
-                if (group, GROUP_LABELS.get(group, group), method) in std_data.index
+                std_data.loc[(group, group_label(group), method), metric]
+                if (group, group_label(group), method) in std_data.index
                 else 0
                 for group in present_groups
             ]
@@ -221,7 +289,7 @@ def plot_weighted_metrics(metrics, output_dir, dpi):
                 )
         axis.set_title(metric.title())
         axis.set_xticks(x)
-        axis.set_xticklabels([GROUP_LABELS.get(group, group) for group in present_groups], rotation=30, ha="right")
+        axis.set_xticklabels([group_label(group) for group in present_groups], rotation=30, ha="right")
         axis.set_ylim(0, 1.1)
         axis.grid(axis="y", alpha=0.3)
     axes[0].set_ylabel("Mean weighted score (+/- SD)")
@@ -232,13 +300,13 @@ def plot_weighted_metrics(metrics, output_dir, dpi):
     plt.close(figure)
 
 
-def plot_class_f1(metrics, output_dir, dpi, output_name="group_comparison_class_f1.png", title="Group comparison: class F1"):
+def plot_class_f1(metrics, output_dir, dpi, groups, methods, output_name="group_comparison_class_f1.png", title="Group comparison: class F1"):
     class_metrics = metrics[metrics["class"] != "weighted"]
     grouped = class_metrics.groupby(["group", "group_label", "method", "class"])["f1"]
     mean_data = grouped.mean().reset_index()
     std_data = grouped.std().fillna(0)
-    present_groups = [group for group in GROUP_ORDER if group in mean_data["group"].unique()]
-    methods = [method for method in METHODS if method in mean_data["method"].unique()]
+    present_groups = [group for group in groups if group in mean_data["group"].unique()]
+    methods = [method for method in methods if method in mean_data["method"].unique()]
     classes = sorted(mean_data["class"].unique(), key=class_sort_key)
     x = list(range(len(present_groups)))
     width = min(0.8 / max(len(methods), 1), 0.28)
@@ -251,8 +319,8 @@ def plot_class_f1(metrics, output_dir, dpi, output_name="group_comparison_class_
             method_data = class_data[class_data["method"] == method].set_index("group")
             values = [method_data.loc[group, "f1"] if group in method_data.index else 0 for group in present_groups]
             errors = [
-                std_data.loc[(group, GROUP_LABELS.get(group, group), method, class_id)]
-                if (group, GROUP_LABELS.get(group, group), method, class_id) in std_data.index
+                std_data.loc[(group, group_label(group), method, class_id)]
+                if (group, group_label(group), method, class_id) in std_data.index
                 else 0
                 for group in present_groups
             ]
@@ -272,7 +340,7 @@ def plot_class_f1(metrics, output_dir, dpi, output_name="group_comparison_class_
         axis.set_ylim(0, 1.1)
         axis.grid(axis="y", alpha=0.3)
     axes[-1, 0].set_xticks(x)
-    axes[-1, 0].set_xticklabels([GROUP_LABELS.get(group, group) for group in present_groups], rotation=30, ha="right")
+    axes[-1, 0].set_xticklabels([group_label(group) for group in present_groups], rotation=30, ha="right")
     axes[0, 0].legend(loc="lower right")
     figure.suptitle(title)
     figure.tight_layout(rect=(0, 0, 1, 0.95))
@@ -280,7 +348,7 @@ def plot_class_f1(metrics, output_dir, dpi, output_name="group_comparison_class_
     plt.close(figure)
 
 
-def plot_class_f1_by_variability_bin(metrics, output_dir, dpi):
+def plot_class_f1_by_variability_bin(metrics, output_dir, dpi, groups, methods):
     if "bin_rank" not in metrics.columns:
         return
     bin_ranks = sorted(rank for rank in metrics["bin_rank"].dropna().unique())
@@ -293,6 +361,8 @@ def plot_class_f1_by_variability_bin(metrics, output_dir, dpi):
             bin_metrics,
             output_dir,
             dpi,
+            groups,
+            methods,
             output_name=f"group_comparison_class_f1_bin_{suffix}.png",
             title=f"Group comparison: class F1, variability bin {suffix}",
         )
@@ -301,12 +371,17 @@ def plot_class_f1_by_variability_bin(metrics, output_dir, dpi):
 def main():
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    metrics = load_metrics(args.input_root, args.final_only, args.variability_bins)
+    groups = parse_groups(args)
+    metrics = load_metrics(args.input_root, args.final_only, args.variability_bins, groups)
+    methods = parse_methods(args, metrics)
+    if not methods:
+        raise ValueError("No methods left to plot after applying --methods/--exclude-method")
+    metrics = metrics[metrics["method"].isin(methods)]
     metrics.to_csv(args.output_dir / "group_comparison_metrics.csv", index=False)
-    plot_weighted_metrics(metrics, args.output_dir, args.dpi)
-    plot_class_f1(metrics, args.output_dir, args.dpi)
+    plot_weighted_metrics(metrics, args.output_dir, args.dpi, groups, methods)
+    plot_class_f1(metrics, args.output_dir, args.dpi, groups, methods)
     if args.variability_bins:
-        plot_class_f1_by_variability_bin(metrics, args.output_dir, args.dpi)
+        plot_class_f1_by_variability_bin(metrics, args.output_dir, args.dpi, groups, methods)
     print(f"Saved comparison plots to {args.output_dir.resolve()}")
 
 

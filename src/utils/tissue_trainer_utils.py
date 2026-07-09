@@ -12,6 +12,7 @@ from transformers.trainer import TRAINING_ARGS_NAME
 sys.path.insert(0, os.path.abspath("/cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code"))
 
 from src.constants import REGRESSION_ANALYSIS_SYMBOL, SAVED_EPOCH_PREFIX
+from src.utils.wandb_utils import get_wandb_report_to, prepare_wandb_environment
 from src.utils.metrics_utils import (
     accuracy_score,
     compute_metrics,
@@ -146,13 +147,22 @@ def get_trainer(
     save_stratagy="epoch",
     number_of_steps=-1,
     save_total_limit=-1,
+    eval_steps=None,
+    logging_steps=None,
     add_epoch_end_save_callback=False,
     task_level="token",
+    wandb_config=None,
+    wandb_metadata=None,
 ) -> Trainer:
+    has_eval_dataset = eval_dataset is not None
     if eval_dataset is None:
         eval_dataset = dataset
     trainer_type = get_trainer_type(model_type, task_level=task_level)
     compute_metrics_func = get_compute_func(model_type, task_level=task_level)
+    wandb_metadata = wandb_metadata or {}
+    report_to = get_wandb_report_to(wandb_config)
+    run_name = wandb_metadata.get("name") if report_to == "wandb" else None
+    prepare_wandb_environment(wandb_config, wandb_metadata)
 
     args = get_training_args(
         learning_rate,
@@ -167,6 +177,11 @@ def get_trainer(
         save_stratagy,
         number_of_steps,
         save_total_limit,
+        eval_steps=eval_steps,
+        logging_steps=logging_steps,
+        has_eval_dataset=has_eval_dataset,
+        report_to=report_to,
+        run_name=run_name,
     )
 
     trainer = trainer_type(
@@ -182,6 +197,24 @@ def get_trainer(
     return trainer
 
 
+def get_evaluation_strategy(load_best_at_end, has_eval_dataset, save_stratagy, eval_steps):
+    if not has_eval_dataset:
+        return "no"
+    if load_best_at_end:
+        if save_stratagy in {"epoch", "steps"}:
+            return save_stratagy
+        return "epoch"
+    if eval_steps > 0:
+        return "steps"
+    return "epoch"
+
+
+def _resolve_step_value(value, default=-1):
+    if value is None:
+        return default
+    return int(value)
+
+
 def get_training_args(
     learning_rate,
     per_device_train_batch_size,
@@ -195,16 +228,31 @@ def get_training_args(
     save_stratagy,
     number_of_steps,
     save_total_limit,
+    eval_steps=None,
+    logging_steps=None,
+    has_eval_dataset=False,
+    report_to="none",
+    run_name=None,
 ):
-    evaluation_strategy = "no"
-    if load_best_at_end:
-        evaluation_strategy = "epoch"
+    resolved_eval_steps = _resolve_step_value(eval_steps, default=number_of_steps)
+    resolved_logging_steps = _resolve_step_value(logging_steps, default=-1)
+    evaluation_strategy = get_evaluation_strategy(
+        load_best_at_end,
+        has_eval_dataset,
+        save_stratagy,
+        resolved_eval_steps,
+    )
     args = None
     extra_params = {}
-    if save_stratagy == "steps":
+    if save_stratagy == "steps" and number_of_steps > 0:
         extra_params["save_steps"] = number_of_steps
         if save_total_limit > 0:
             extra_params["save_total_limit"] = save_total_limit
+    if evaluation_strategy == "steps" and resolved_eval_steps > 0:
+        extra_params["eval_steps"] = resolved_eval_steps
+    if resolved_logging_steps > 0:
+        extra_params["logging_steps"] = resolved_logging_steps
+        extra_params["logging_strategy"] = "steps"
     if eval_mode:
         args = TrainingArguments(
             output_dir=output_dir,
@@ -215,9 +263,11 @@ def get_training_args(
             per_device_eval_batch_size=per_device_eval_batch_size,
             eval_accumulation_steps=eval_accumulation_steps,
             num_train_epochs=num_train_epochs,
-            logging_steps=1000,
-            logging_strategy="epoch",
-            report_to="none",
+            logging_steps=resolved_logging_steps if resolved_logging_steps > 0 else 1000,
+            eval_steps=resolved_eval_steps if resolved_eval_steps > 0 else 20,
+            logging_strategy="steps" if resolved_logging_steps > 0 else "epoch",
+            report_to=report_to,
+            run_name=run_name,
             dataloader_num_workers=4,
             dataloader_prefetch_factor=3,
             bf16=True,
@@ -233,7 +283,8 @@ def get_training_args(
             save_strategy=save_stratagy,
             load_best_model_at_end=load_best_at_end,
             metric_for_best_model=metric_for_best_model,
-            report_to="none",
+            report_to=report_to,
+            run_name=run_name,
             dataloader_num_workers=120,
             dataloader_prefetch_factor=90,
             bf16=True,

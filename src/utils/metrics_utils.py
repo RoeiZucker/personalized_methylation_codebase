@@ -32,17 +32,20 @@ def apply_results_for_class(class_id, flat_labels, flat_preds, flat_probs, resul
     )["f1"]
     results[f"precision_class_{class_id}"] = precision_score.compute(
         predictions=y_pred,
-        references=y_true
+        references=y_true,
+        zero_division=0,
     )["precision"]
     results[f"recall_class_{class_id}"] = recall_score.compute(
         predictions=y_pred,
-        references=y_true
+        references=y_true,
+        zero_division=0,
     )["recall"]
 
 def compute_metrics(p):
     preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
 
     # Convert logits to probabilities
+    preds = preds - np.max(preds, axis=-1, keepdims=True)
     probs = np.exp(preds) / np.exp(preds).sum(axis=-1, keepdims=True)
     labels = np.array(p.label_ids)
     num_classes = probs.shape[-1]
@@ -107,10 +110,44 @@ def flatten_and_mask_results(labels, num_classes, probs):
 
 
 def apply_global_results(flat_labels, flat_preds, results):
+    if flat_labels.size == 0:
+        results["accuracy"] = np.nan
+        results["precision"] = np.nan
+        results["recall"] = np.nan
+        results["f1"] = np.nan
+        results["weighted_precision"] = np.nan
+        results["weighted_recall"] = np.nan
+        results["weighted_f1"] = np.nan
+        results["mcc"] = np.nan
+        return
+
     results["accuracy"] = accuracy_score.compute(
         predictions=flat_preds,
         references=flat_labels
     )["accuracy"]
+    precision = precision_score.compute(
+        predictions=flat_preds,
+        references=flat_labels,
+        average="weighted",
+        zero_division=0,
+    )["precision"]
+    recall = recall_score.compute(
+        predictions=flat_preds,
+        references=flat_labels,
+        average="weighted",
+        zero_division=0,
+    )["recall"]
+    f1 = f1_score.compute(
+        predictions=flat_preds,
+        references=flat_labels,
+        average="weighted",
+    )["f1"]
+    results["precision"] = precision
+    results["recall"] = recall
+    results["f1"] = f1
+    results["weighted_precision"] = precision
+    results["weighted_recall"] = recall
+    results["weighted_f1"] = f1
     results["mcc"] = mcc_score.compute(
         predictions=flat_preds,
         references=flat_labels

@@ -15,6 +15,8 @@ def evaluate_sample_predictions(result_files_path,
                                 all_two=False,
                                 verbose=True,
                                 comparison_dicts=None,
+                                skip_mean_label=False,
+                                precomputed_scores=None,
                                 **legacy_kwargs):
     """Evaluate prediction results against dataset.
 
@@ -29,6 +31,12 @@ def evaluate_sample_predictions(result_files_path,
         all_two: If True, append an all_two comparison type with constant value 2.
         verbose: Whether to print progress information.
         comparison_dicts: Precomputed comparison dictionaries.
+        skip_mean_label: If True, do not create mean_value/mean_label. This is useful
+            when only model scores are needed or mean_label scores are precomputed.
+        precomputed_scores: Evaluation-object entries to copy into every result file,
+            usually fixed scores for mean_label/all_two. For example, this can be an
+            all_results dict containing mean_label, mean_label_confusion_matrix,
+            all_two, and all_two_confusion_matrix.
 
     Returns:
         A dictionary of evaluation objects keyed by result file path.
@@ -43,10 +51,37 @@ def evaluate_sample_predictions(result_files_path,
         unexpected = ", ".join(sorted(legacy_kwargs))
         raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
 
-    if comparison_dicts is None:
-        compare_dicts = create_comparison_dicts(comparison_bigwig_files,chroms,full_pos_name)
+    if comparison_types is None:
+        comparison_types = ["predicted_class"]
+    requested_comparison_types = list(comparison_types)
+    if all_two and "all_two" not in requested_comparison_types:
+        requested_comparison_types.append("all_two")
+
+    precomputed_scores = precomputed_scores or {}
+    precomputed_types = {
+        key
+        for key in precomputed_scores
+        if not key.endswith("_confusion_matrix")
+    }
+    dynamic_comparison_types = [
+        comparison_type
+        for comparison_type in requested_comparison_types
+        if comparison_type not in precomputed_types
+    ]
+    if skip_mean_label and "mean_label" in dynamic_comparison_types:
+        dynamic_comparison_types.remove("mean_label")
+
+    needs_mean_label = "mean_label" in dynamic_comparison_types
+    position_mean_lookup = None
+    if needs_mean_label:
+        if comparison_dicts is None:
+            compare_dicts = create_comparison_dicts(comparison_bigwig_files,chroms,full_pos_name)
+        else:
+            compare_dicts = comparison_dicts
+        position_mean_lookup = create_position_mean_lookup(compare_dicts)
     else:
-        compare_dicts = comparison_dicts
+        compare_dicts = None
+
     eval_objects_dict = {}
 
     for result_file_path in result_files_path:
@@ -54,16 +89,36 @@ def evaluate_sample_predictions(result_files_path,
             print("curr result file",result_file_path,flush=True)
         curr_result_eval = {}
         eval_objects_dict[result_file_path] = curr_result_eval
-        new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
-        if all_two:
+
+        if needs_mean_label:
+            new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges, position_mean_lookup)
+        else:
+            file_comparison_types = [
+                comparison_type
+                for comparison_type in dynamic_comparison_types
+                if comparison_type != "all_two"
+            ]
+            new_result_file = read_result_file_for_comparison_types(
+                result_file_path,
+                file_comparison_types,
+            )
+
+        if all_two and "all_two" in dynamic_comparison_types:
             new_result_file["all_two"] = 2
-        curr_comparison_types = list(comparison_types)
-        if all_two and "all_two" not in curr_comparison_types:
-            curr_comparison_types.append("all_two")
-        eval_object = create_eval_object(new_result_file,curr_comparison_types,labels)
+
+        eval_object = dict(precomputed_scores)
+        if dynamic_comparison_types:
+            eval_object.update(create_eval_object(new_result_file,dynamic_comparison_types,labels))
         curr_result_eval["all_results"] = eval_object
 
     return eval_objects_dict
+
+def read_result_file_for_comparison_types(result_file_path, comparison_types):
+    usecols = ["label", *comparison_types]
+    new_result_file = pd.read_csv(result_file_path, usecols=usecols)
+    new_result_file["label"] = new_result_file["label"].astype(int)
+    return new_result_file
+
 
 def create_eval_object(new_result_file,comparison_types,labels):
     eval_object = {}
@@ -137,8 +192,8 @@ def create_mean_labels(mean_values,ranges):
     return result
 
 
-def create_result_file_mean_label(result_file_path, compare_dicts,ranges):
-    result_file = create_result_file_mean_value(result_file_path, compare_dicts)
+def create_result_file_mean_label(result_file_path, compare_dicts,ranges, position_mean_lookup=None):
+    result_file = create_result_file_mean_value(result_file_path, compare_dicts, position_mean_lookup)
     new_result_file = result_file.dropna(subset=["mean_value"]).copy()
     new_result_file["mean_label"] = create_mean_labels(new_result_file["mean_value"],ranges)
     return new_result_file
@@ -158,8 +213,9 @@ def create_position_mean_lookup(compare_dicts):
     return position_mean_lookup
 
 
-def create_mean_values(result_file, compare_dicts):
-    position_mean_lookup = create_position_mean_lookup(compare_dicts)
+def create_mean_values(result_file, compare_dicts, position_mean_lookup=None):
+    if position_mean_lookup is None:
+        position_mean_lookup = create_position_mean_lookup(compare_dicts)
     mean_values = pd.Series(np.nan, index=result_file.index, dtype="float64")
     for chrom, chrom_rows in result_file.groupby("chrom", sort=False):
         if chrom not in position_mean_lookup:
@@ -185,9 +241,9 @@ def create_mean_values(result_file, compare_dicts):
     return mean_values
 
 
-def create_result_file_mean_value(result_file_path, compare_dicts):
+def create_result_file_mean_value(result_file_path, compare_dicts, position_mean_lookup=None):
     result_file = pd.read_csv(result_file_path)
     result_file["label"] = result_file["label"].astype(int)
     result_file["chrom"] = result_file["window_id"].str.split(":").str[0]
-    result_file["mean_value"] = create_mean_values(result_file, compare_dicts)
+    result_file["mean_value"] = create_mean_values(result_file, compare_dicts, position_mean_lookup)
     return result_file

@@ -277,6 +277,7 @@ def create_token_classification_training_config(
     verbose=True,
     assemblies=None,
     generator_cache_dir=DEFAULT_GENERATOR_CACHE_DIR,
+    wandb_config=None,
 ):
     model_repo, model_name = _split_tokenizer_name(tokenizer_name)
     base_dict = create_base_dictionary(
@@ -329,6 +330,8 @@ def create_token_classification_training_config(
         "save_at_end": save_at_end,
         "continue_from_last": continue_from_last,
     }
+    if wandb_config is not None:
+        base_dict["wandb"] = wandb_config
     return base_dict
 
 

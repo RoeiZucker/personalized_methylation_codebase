@@ -61,10 +61,15 @@ except ImportError:
     mse = _SimpleMetric(_mse_metric, 'mse')
     mae = _SimpleMetric(_mae_metric, 'mae')
 
-try:
-    from transformers import AutoTokenizer
-except ImportError:
-    AutoTokenizer = None
+AutoTokenizer = None
+
+
+def get_auto_tokenizer_class():
+    global AutoTokenizer
+    if AutoTokenizer is None:
+        from transformers import AutoTokenizer as imported_auto_tokenizer
+        AutoTokenizer = imported_auto_tokenizer
+    return AutoTokenizer
 
 try:
     from .utils.trainer_utils import(
@@ -186,6 +191,7 @@ def evaluate_sample_predictions(variability_file_path,
                                 label_b=None,
                                 number_of_bins=None,
                                 comparison_dicts=None,
+                                mean_label_cache_path=None,
                                 **legacy_kwargs):
     if "comparison_bigiwg_files" in legacy_kwargs:
         if comparison_bigwig_files is not None:
@@ -202,10 +208,17 @@ def evaluate_sample_predictions(variability_file_path,
         compare_dicts = comparison_dicts
     eval_objects_dict = {}
 
+    cached_labeled_result_file = load_or_create_mean_label_cache(
+        result_files_path[0],
+        compare_dicts,
+        ranges,
+        mean_label_cache_path,
+    )
+
     for result_file_path in result_files_path:
         curr_result_eval = {}
         eval_objects_dict[result_file_path] = curr_result_eval
-        new_result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
+        new_result_file = attach_prediction_columns(cached_labeled_result_file, result_file_path)
         eval_object = create_eval_object(new_result_file,label_a,label_b,labels)
         curr_result_eval["all_results"] = eval_object
 
@@ -221,6 +234,75 @@ def evaluate_sample_predictions(variability_file_path,
             eval_object = create_eval_object(filtered_data,label_a,label_b,labels)
             curr_result_eval[f"{low}-{high}"] = eval_object
     return eval_objects_dict
+
+
+def load_or_create_mean_label_cache(result_file_path, compare_dicts, ranges, mean_label_cache_path):
+    if mean_label_cache_path is not None:
+        mean_label_cache_path = Path(mean_label_cache_path)
+        if mean_label_cache_path.exists():
+            return pd.read_pickle(mean_label_cache_path)
+
+    result_file = create_result_file_mean_label(result_file_path, compare_dicts,ranges)
+    result_file["full_position"] = result_file["chrom"] + ":" + result_file["genomic_position"].astype(str) + "-"+ (result_file["genomic_position"] + 2).astype(str)
+    cache_columns = [
+        column
+        for column in [
+            "window_id",
+            "genomic_position",
+            "label",
+            "chrom",
+            "mean_value",
+            "mean_label",
+            "full_position",
+        ]
+        if column in result_file.columns
+    ]
+    result_file = result_file[cache_columns].copy()
+
+    if mean_label_cache_path is not None:
+        mean_label_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        result_file.to_pickle(mean_label_cache_path)
+    return result_file
+
+
+def attach_prediction_columns(cached_labeled_result_file, result_file_path):
+    if "window_id" not in cached_labeled_result_file.columns:
+        prediction_columns = pd.read_csv(result_file_path, usecols=["label", "predicted_class"])
+        prediction_columns["label"] = prediction_columns["label"].astype(int)
+        new_result_file = cached_labeled_result_file.copy().reset_index(drop=True)
+        prediction_columns = prediction_columns.iloc[: len(new_result_file)].reset_index(drop=True)
+        if not new_result_file["label"].reset_index(drop=True).equals(prediction_columns["label"]):
+            raise ValueError(f"Cached labels do not match prediction labels: {result_file_path}")
+        new_result_file["predicted_class"] = prediction_columns["predicted_class"].to_numpy()
+        return new_result_file
+
+    merge_keys = ["window_id"]
+    prediction_usecols = ["window_id", "label", "predicted_class"]
+    if "genomic_position" in cached_labeled_result_file.columns:
+        merge_keys.append("genomic_position")
+        prediction_usecols.append("genomic_position")
+
+    prediction_columns = pd.read_csv(result_file_path, usecols=prediction_usecols)
+    prediction_columns["label"] = prediction_columns["label"].astype(int)
+    if prediction_columns.duplicated(merge_keys).any():
+        raise ValueError(f"Prediction file has duplicate position keys {merge_keys}: {result_file_path}")
+    if cached_labeled_result_file.duplicated(merge_keys).any():
+        raise ValueError(f"Mean-label cache has duplicate position keys {merge_keys}")
+
+    merged_result_file = cached_labeled_result_file.merge(
+        prediction_columns.rename(columns={"label": "prediction_file_label"}),
+        on=merge_keys,
+        how="inner",
+        sort=False,
+    )
+    if merged_result_file.empty:
+        raise ValueError(f"No cached positions matched prediction file: {result_file_path}")
+    if not merged_result_file["label"].reset_index(drop=True).equals(
+        merged_result_file["prediction_file_label"].reset_index(drop=True)
+    ):
+        raise ValueError(f"Cached labels do not match prediction labels: {result_file_path}")
+    return merged_result_file.drop(columns=["prediction_file_label"])
+
 
 def create_eval_object(new_result_file,label_a,label_b,labels):
     eval_object = {}
@@ -403,7 +485,7 @@ def evaluate_checkpoint(model_repo: str, model_name: str,is_lora: bool,num_label
     model = get_fine_tuned_model(is_lora, num_labels, base_model_name, model_path, for_inference=True)
     model.eval()
 
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+    tokenizer = get_auto_tokenizer_class().from_pretrained(base_model_name)
     trainer = get_trainer(
         dataset,
         model,
@@ -1313,7 +1395,7 @@ def predict_checkpoint(
     model = get_fine_tuned_model(is_lora, num_labels, base_model_name, model_path, for_inference=True)
     model.eval()
     
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+    tokenizer = get_auto_tokenizer_class().from_pretrained(base_model_name)
     trainer = get_trainer(
         dataset,
         model,

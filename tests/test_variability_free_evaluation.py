@@ -4,6 +4,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
@@ -18,6 +19,7 @@ from variability_free_evaluation import (  # noqa: E402
     create_result_file_mean_label,
     create_result_file_mean_value,
     evaluate_sample_predictions,
+    read_result_file_for_comparison_types,
 )
 
 
@@ -113,6 +115,26 @@ def test_create_mean_labels_assigns_threshold_values_to_lower_bins():
     labels = create_mean_labels(pd.Series([0.2, 0.8]), [0, 0.2, 0.8, 1])
 
     assert labels.tolist() == [0, 1]
+
+
+def test_read_result_file_for_comparison_types_loads_only_needed_columns(tmp_path):
+    result_file_path = tmp_path / "eval_predictions_extra_columns.csv"
+    pd.DataFrame(
+        {
+            "label": [0, 1, 2],
+            "predicted_class": [0, 2, 2],
+            "window_id": ["chr1:10-12", "chr1:20-22", "chr1:30-32"],
+            "large_unused_column": ["unused", "unused", "unused"],
+        }
+    ).to_csv(result_file_path, index=False)
+
+    result = read_result_file_for_comparison_types(
+        str(result_file_path),
+        ["predicted_class"],
+    )
+
+    assert result.columns.tolist() == ["label", "predicted_class"]
+    assert result["label"].dtype.kind in {"i", "u"}
 
 
 def test_create_mean_labels_matches_legacy_on_generated_values():
@@ -445,3 +467,310 @@ def test_variability_bins_eval_object_matches_legacy_copy_heavy_implementation()
     )
 
     assert actual == expected
+
+
+
+def test_evaluate_sample_predictions_can_skip_mean_label_with_precomputed_scores(tmp_path):
+    result_file_path = tmp_path / "eval_predictions.csv"
+    pd.DataFrame(
+        {
+            "window_id": ["chr1:10-12", "chr1:20-22", "chr1:30-32"],
+            "genomic_position": [10, 20, 30],
+            "label": [0, 1, 2],
+            "predicted_class": [0, 2, 2],
+        }
+    ).to_csv(result_file_path, index=False)
+    precomputed_scores = {
+        "mean_label": {
+            0: {"Precision": 1.0, "recall": 1.0},
+            1: {"Precision": 0.5, "recall": 0.5},
+            2: {"Precision": 0.25, "recall": 0.25},
+        },
+        "mean_label_confusion_matrix": {0: {0: 1}, 1: {1: 1}, 2: {2: 1}},
+        "all_two": {
+            0: {"Precision": 0.0, "recall": 0.0},
+            1: {"Precision": 0.0, "recall": 0.0},
+            2: {"Precision": 1 / 3, "recall": 1.0},
+        },
+        "all_two_confusion_matrix": {2: {0: 1, 1: 1, 2: 1}},
+    }
+
+    result = evaluate_sample_predictions(
+        result_files_path=[str(result_file_path)],
+        chroms=["chr1"],
+        comparison_bigwig_files=None,
+        full_pos_name="full_pos",
+        ranges=[0, 0.2, 0.8, 1],
+        labels=[0, 1, 2],
+        comparison_types=["mean_label", "predicted_class"],
+        all_two=True,
+        skip_mean_label=True,
+        precomputed_scores=precomputed_scores,
+    )
+
+    eval_object = result[str(result_file_path)]["all_results"]
+    assert eval_object["mean_label"] == precomputed_scores["mean_label"]
+    assert eval_object["all_two"] == precomputed_scores["all_two"]
+    assert eval_object["predicted_class"][0]["Precision"] == 1.0
+    assert eval_object["predicted_class"][1]["recall"] == 0.0
+    assert eval_object["predicted_class"][2]["recall"] == 1.0
+
+
+def write_variability_bins_result_file(path, predictions):
+    pd.DataFrame(
+        {
+            "window_id": ["chr1:10-12", "chr1:20-22", "chr1:30-32", "chr1:40-42"],
+            "genomic_position": [10, 20, 30, 40],
+            "label": [0, 1, 2, 1],
+            "predicted_class": predictions,
+        }
+    ).to_csv(path, index=False)
+
+
+def create_variability_bins_compare_dicts():
+    compare_dicts = {"chr1": {}}
+    for genomic_position, methyl_rate in [(10, 0.1), (20, 0.5), (30, 0.9), (40, 0.3)]:
+        for position in range(genomic_position - 1, genomic_position + 6):
+            compare_dicts["chr1"][position] = {
+                "methyl_rate_ind_0": methyl_rate,
+                "methyl_rate_ind_1": methyl_rate,
+            }
+    return compare_dicts
+
+
+def write_variability_file(path):
+    pd.DataFrame(
+        {
+            "full_position": ["chr1:10-12", "chr1:20-22", "chr1:30-32", "chr1:40-42"],
+            "std": [0.1, 0.2, 0.7, 0.9],
+        }
+    ).to_csv(path, index=False)
+
+
+def create_legacy_variability_bins_expected(result_files_path, variability_file_path, compare_dicts):
+    variability_file = pd.read_csv(variability_file_path)
+    expected = {}
+    std_max = variability_file["std"].max()
+    for result_file_path in result_files_path:
+        result_file_path = str(result_file_path)
+        curr_result_eval = {}
+        expected[result_file_path] = curr_result_eval
+        new_result_file = variability_bins_evaluator.create_result_file_mean_label(
+            result_file_path,
+            compare_dicts,
+            [0, 0.2, 0.8, 1],
+        )
+        new_result_file["full_position"] = (
+            new_result_file["chrom"]
+            + ":"
+            + new_result_file["genomic_position"].astype(str)
+            + "-"
+            + (new_result_file["genomic_position"] + 2).astype(str)
+        )
+        curr_result_eval["all_results"] = variability_bins_evaluator.create_eval_object(
+            new_result_file,
+            "mean_label",
+            "predicted_class",
+            [0, 1, 2],
+        )
+        for i in range(2):
+            low = (std_max / 2) * i
+            high = (std_max / 2) * (i + 1)
+            filtered = variability_file[(variability_file["std"] > low) & (variability_file["std"] <= high)]
+            filtered_data = new_result_file[new_result_file["full_position"].isin(set(filtered["full_position"]))]
+            curr_result_eval[f"{low}-{high}"] = variability_bins_evaluator.create_eval_object(
+                filtered_data,
+                "mean_label",
+                "predicted_class",
+                [0, 1, 2],
+            )
+    return expected
+
+
+def test_variability_bins_evaluation_cache_matches_legacy_per_file_mean_label_calculation(tmp_path):
+    first_result_file = tmp_path / "eval_predictions_first.csv"
+    second_result_file = tmp_path / "eval_predictions_second.csv"
+    variability_file_path = tmp_path / "variability.csv"
+    cache_path = tmp_path / "cache" / "sample_mean_label_cache.pkl"
+    write_variability_bins_result_file(first_result_file, [0, 1, 2, 2])
+    write_variability_bins_result_file(second_result_file, [2, 1, 0, 1])
+    write_variability_file(variability_file_path)
+    compare_dicts = create_variability_bins_compare_dicts()
+    result_files_path = [str(first_result_file), str(second_result_file)]
+
+    expected = create_legacy_variability_bins_expected(
+        result_files_path,
+        str(variability_file_path),
+        compare_dicts,
+    )
+    actual = variability_bins_evaluator.evaluate_sample_predictions(
+        variability_file_path=str(variability_file_path),
+        result_files_path=result_files_path,
+        chroms=["chr1"],
+        comparison_bigwig_files=None,
+        full_pos_name="full_pos",
+        ranges=[0, 0.2, 0.8, 1],
+        labels=[0, 1, 2],
+        label_a="mean_label",
+        label_b="predicted_class",
+        number_of_bins=2,
+        comparison_dicts=compare_dicts,
+        mean_label_cache_path=cache_path,
+    )
+
+    assert actual == expected
+    assert cache_path.exists()
+    cached = pd.read_pickle(cache_path)
+    assert cached["mean_label"].tolist() == [0, 1, 2, 1]
+    assert cached["full_position"].tolist() == ["chr1:10-12", "chr1:20-22", "chr1:30-32", "chr1:40-42"]
+
+
+def test_variability_bins_evaluation_reuses_existing_mean_label_cache_without_recalculating(tmp_path, monkeypatch):
+    first_result_file = tmp_path / "eval_predictions_first.csv"
+    second_result_file = tmp_path / "eval_predictions_second.csv"
+    variability_file_path = tmp_path / "variability.csv"
+    cache_path = tmp_path / "cache" / "sample_mean_label_cache.pkl"
+    write_variability_bins_result_file(first_result_file, [0, 1, 2, 2])
+    write_variability_bins_result_file(second_result_file, [2, 1, 0, 1])
+    write_variability_file(variability_file_path)
+    compare_dicts = create_variability_bins_compare_dicts()
+    result_files_path = [str(first_result_file), str(second_result_file)]
+
+    first_result = variability_bins_evaluator.evaluate_sample_predictions(
+        variability_file_path=str(variability_file_path),
+        result_files_path=result_files_path,
+        chroms=["chr1"],
+        comparison_bigwig_files=None,
+        full_pos_name="full_pos",
+        ranges=[0, 0.2, 0.8, 1],
+        labels=[0, 1, 2],
+        label_a="mean_label",
+        label_b="predicted_class",
+        number_of_bins=2,
+        comparison_dicts=compare_dicts,
+        mean_label_cache_path=cache_path,
+    )
+
+    def fail_if_recalculated(*args, **kwargs):
+        raise AssertionError("mean_label should have been loaded from cache")
+
+    monkeypatch.setattr(
+        variability_bins_evaluator,
+        "create_result_file_mean_label",
+        fail_if_recalculated,
+    )
+    second_result = variability_bins_evaluator.evaluate_sample_predictions(
+        variability_file_path=str(variability_file_path),
+        result_files_path=result_files_path,
+        chroms=["chr1"],
+        comparison_bigwig_files=None,
+        full_pos_name="full_pos",
+        ranges=[0, 0.2, 0.8, 1],
+        labels=[0, 1, 2],
+        label_a="mean_label",
+        label_b="predicted_class",
+        number_of_bins=2,
+        comparison_dicts=compare_dicts,
+        mean_label_cache_path=cache_path,
+    )
+
+    assert second_result == first_result
+
+
+def test_variability_bins_cache_reuse_rejects_prediction_files_with_different_window_ids(tmp_path):
+    first_result_file = tmp_path / "eval_predictions_first.csv"
+    incompatible_result_file = tmp_path / "eval_predictions_incompatible.csv"
+    variability_file_path = tmp_path / "variability.csv"
+    cache_path = tmp_path / "cache" / "sample_mean_label_cache.pkl"
+    write_variability_bins_result_file(first_result_file, [0, 1, 2, 2])
+    write_variability_bins_result_file(incompatible_result_file, [0, 1, 2, 2])
+    incompatible = pd.read_csv(incompatible_result_file)
+    incompatible.loc[2, "window_id"] = "chr1:999-1001"
+    incompatible.to_csv(incompatible_result_file, index=False)
+    write_variability_file(variability_file_path)
+    compare_dicts = create_variability_bins_compare_dicts()
+
+    with pytest.raises(ValueError, match="Cached window IDs do not match"):
+        variability_bins_evaluator.evaluate_sample_predictions(
+            variability_file_path=str(variability_file_path),
+            result_files_path=[str(first_result_file), str(incompatible_result_file)],
+            chroms=["chr1"],
+            comparison_bigwig_files=None,
+            full_pos_name="full_pos",
+            ranges=[0, 0.2, 0.8, 1],
+            labels=[0, 1, 2],
+            label_a="mean_label",
+            label_b="predicted_class",
+            number_of_bins=2,
+            comparison_dicts=compare_dicts,
+            mean_label_cache_path=cache_path,
+        )
+
+
+def test_variability_bins_cache_reuse_rejects_prediction_files_with_different_labels(tmp_path):
+    first_result_file = tmp_path / "eval_predictions_first.csv"
+    incompatible_result_file = tmp_path / "eval_predictions_incompatible.csv"
+    variability_file_path = tmp_path / "variability.csv"
+    cache_path = tmp_path / "cache" / "sample_mean_label_cache.pkl"
+    write_variability_bins_result_file(first_result_file, [0, 1, 2, 2])
+    write_variability_bins_result_file(incompatible_result_file, [0, 1, 2, 2])
+    incompatible = pd.read_csv(incompatible_result_file)
+    incompatible.loc[1, "label"] = 2
+    incompatible.to_csv(incompatible_result_file, index=False)
+    write_variability_file(variability_file_path)
+    compare_dicts = create_variability_bins_compare_dicts()
+
+    with pytest.raises(ValueError, match="Cached labels do not match"):
+        variability_bins_evaluator.evaluate_sample_predictions(
+            variability_file_path=str(variability_file_path),
+            result_files_path=[str(first_result_file), str(incompatible_result_file)],
+            chroms=["chr1"],
+            comparison_bigwig_files=None,
+            full_pos_name="full_pos",
+            ranges=[0, 0.2, 0.8, 1],
+            labels=[0, 1, 2],
+            label_a="mean_label",
+            label_b="predicted_class",
+            number_of_bins=2,
+            comparison_dicts=compare_dicts,
+            mean_label_cache_path=cache_path,
+        )
+
+
+def test_evaluate_sample_predictions_does_not_read_synthetic_all_two_from_csv(tmp_path):
+    result_file_path = tmp_path / "eval_predictions_without_all_two.csv"
+    pd.DataFrame(
+        {
+            "window_id": ["chr1:10-12", "chr1:20-22", "chr1:30-32"],
+            "genomic_position": [10, 20, 30],
+            "label": [0, 1, 2],
+            "predicted_class": [0, 2, 2],
+        }
+    ).to_csv(result_file_path, index=False)
+    precomputed_scores = {
+        "mean_label": {
+            0: {"Precision": 1.0, "recall": 1.0},
+            1: {"Precision": 1.0, "recall": 1.0},
+            2: {"Precision": 1.0, "recall": 1.0},
+        },
+        "mean_label_confusion_matrix": {0: {0: 1}, 1: {1: 1}, 2: {2: 1}},
+    }
+
+    result = evaluate_sample_predictions(
+        result_files_path=[str(result_file_path)],
+        chroms=["chr1"],
+        comparison_bigwig_files=None,
+        full_pos_name="full_pos",
+        ranges=[0, 0.2, 0.8, 1],
+        labels=[0, 1, 2],
+        comparison_types=["mean_label", "predicted_class"],
+        all_two=True,
+        skip_mean_label=True,
+        precomputed_scores=precomputed_scores,
+    )
+
+    eval_object = result[str(result_file_path)]["all_results"]
+    assert eval_object["mean_label"] == precomputed_scores["mean_label"]
+    assert eval_object["predicted_class"][2]["recall"] == 1.0
+    assert eval_object["all_two"][2]["recall"] == 1.0
+

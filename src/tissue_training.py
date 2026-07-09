@@ -13,6 +13,7 @@ try:
     )
     from .utils.dataset_utils import get_dataset_for_paths
     from .utils.label_transform_utils import apply_label_transform_to_dataset, get_task_label_transform
+    from .utils.wandb_utils import build_wandb_metadata, get_wandb_config
     from .utils.tissue_model_utils import get_base_model, get_fine_tuned_model
     from .utils.tissue_trainer_utils import get_trainer
 except ImportError:
@@ -23,6 +24,7 @@ except ImportError:
     )
     from utils.dataset_utils import get_dataset_for_paths
     from utils.label_transform_utils import apply_label_transform_to_dataset, get_task_label_transform
+    from utils.wandb_utils import build_wandb_metadata, get_wandb_config
     from utils.tissue_model_utils import get_base_model, get_fine_tuned_model
     from utils.tissue_trainer_utils import get_trainer
 
@@ -39,6 +41,8 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
     model_config = cfg["model"]
     train_config = cfg["train"]
     paths = cfg["paths"]
+    wandb_config = get_wandb_config(cfg)
+    wandb_metadata = build_wandb_metadata(wandb_config, cfg["task"], model_config)
 
     tissue_prompt_config = model_config.get("tissue_prompt")
     if tissue_prompt_config is None:
@@ -66,6 +70,8 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
 
     save_stratagy = train_config["save_stratagy"]
     number_of_steps = train_config.get("number_of_steps", -1)
+    eval_steps = train_config.get("eval_steps", None)
+    logging_steps = train_config.get("logging_steps", None)
     save_total_limit = train_config.get("save_total_limit", -1)
     load_dataset_to_memory = train_config.get("load_dataset_to_memory", False)
     min_number_of_cpg_sites = train_config.get("min_number_of_cpg_sites", -1)
@@ -101,11 +107,15 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
             save_stratagy,
             number_of_steps,
             save_total_limit,
+            eval_steps,
+            logging_steps,
             add_epoch_end_save_callback,
             load_dataset_to_memory,
             min_number_of_cpg_sites,
             verbose,
             label_transform,
+            wandb_config,
+            wandb_metadata,
         )
     elif task_type == CPG_RETRAINING_TASK_TYPE:
         cpg_retraining(
@@ -134,11 +144,15 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
             save_stratagy,
             number_of_steps,
             save_total_limit,
+            eval_steps,
+            logging_steps,
             add_epoch_end_save_callback,
             load_dataset_to_memory,
             min_number_of_cpg_sites,
             verbose,
             label_transform,
+            wandb_config,
+            wandb_metadata,
         )
     else:
         ValueError(f"Unknown task type: {task_type}")
@@ -170,11 +184,15 @@ def cpg_retraining(
     save_stratagy,
     number_of_steps,
     save_total_limit,
+    eval_steps,
+    logging_steps,
     add_epoch_end_save_callback,
     load_dataset_to_memory,
     min_number_of_cpg_sites,
     verbose,
     label_transform="none",
+    wandb_config=None,
+    wandb_metadata=None,
 ):
     if verbose:
         print("started retraining for model at path", trained_model_path, flush=True)
@@ -238,7 +256,11 @@ def cpg_retraining(
         save_stratagy=save_stratagy,
         number_of_steps=number_of_steps,
         save_total_limit=save_total_limit,
+        eval_steps=eval_steps,
+        logging_steps=logging_steps,
         add_epoch_end_save_callback=add_epoch_end_save_callback,
+        wandb_config=wandb_config,
+        wandb_metadata=wandb_metadata,
     )
 
     if len(os.listdir(output_dir)) == 0:
@@ -373,11 +395,15 @@ def cpg_training(
     save_stratagy,
     number_of_steps,
     save_total_limit,
+    eval_steps,
+    logging_steps,
     add_epoch_end_save_callback,
     load_dataset_to_memory,
     min_number_of_cpg_sites,
     verbose,
     label_transform="none",
+    wandb_config=None,
+    wandb_metadata=None,
 ):
     if verbose:
         print("started training for", model_name, flush=True)
@@ -431,7 +457,11 @@ def cpg_training(
         save_stratagy=save_stratagy,
         number_of_steps=number_of_steps,
         save_total_limit=save_total_limit,
+        eval_steps=eval_steps,
+        logging_steps=logging_steps,
         add_epoch_end_save_callback=add_epoch_end_save_callback,
+        wandb_config=wandb_config,
+        wandb_metadata=wandb_metadata,
     )
 
     if len(os.listdir(output_dir)) == 0:
