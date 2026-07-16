@@ -72,9 +72,13 @@ def prepare_wandb_environment(wandb_config: Dict[str, Any] | None, metadata: Dic
     _set_env("WANDB_MODE", metadata.get("mode"))
     _set_env("WANDB_TAGS", ",".join(metadata.get("tags") or []))
     _set_env("WANDB_DIR", metadata.get("dir"))
+    _set_env("WANDB_LOG_MODEL", wandb_config.get("log_model", False))
+    _set_env("WANDB_WATCH", wandb_config.get("watch", False))
 
 
 def _set_env(name: str, value: Any) -> None:
     if value is None or value == "":
         return
+    if isinstance(value, bool):
+        value = str(value).lower()
     os.environ[name] = str(value)

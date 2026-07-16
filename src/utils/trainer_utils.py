@@ -236,9 +236,20 @@ class CompatibleTrainer(ResumeCheckpointCompatMixin, Trainer):
     pass
 
 
-class WandbConfigCallback(TrainerCallback):
-    def __init__(self, config):
-        self.config = config
+class WandbMetricsCallback(TrainerCallback):
+    def __init__(self, config=None):
+        self.config = config or {}
+
+    def _rewrite_logs(self, logs):
+        renamed_logs = {}
+        for key, value in logs.items():
+            if key.startswith("eval_"):
+                renamed_logs[f"eval/{key[len('eval_'):]}"] = value
+            elif key.startswith("test_"):
+                renamed_logs[f"test/{key[len('test_'):]}"] = value
+            else:
+                renamed_logs[f"train/{key}"] = value
+        return renamed_logs
 
     def on_train_begin(self, args, state, control, **kwargs):
         try:
@@ -246,8 +257,22 @@ class WandbConfigCallback(TrainerCallback):
         except ImportError:
             return
         if wandb.run is None:
+            wandb.init()
+        if wandb.run is not None and self.config:
+            wandb.config.update(self.config, allow_val_change=True)
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not logs or not getattr(state, "is_world_process_zero", True):
             return
-        wandb.config.update(self.config, allow_val_change=True)
+        try:
+            import wandb
+        except ImportError:
+            return
+        if wandb.run is None:
+            wandb.init()
+        if wandb.run is None:
+            return
+        wandb.log(self._rewrite_logs(logs), step=state.global_step)
 
 
 class TokenRegressionTrainer(ResumeCheckpointCompatMixin, Trainer):
@@ -306,7 +331,7 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
                 metric_for_best_model=None,eval_mode = True,save_stratagy="epoch",number_of_steps=-1,save_total_limit=-1,
                 eval_steps=None,logging_steps=None,
                 add_epoch_end_save_callback=False,add_epoch_end_prediction=True,prediction_metadata_dataset=None,
-                wandb_config=None,wandb_metadata=None) -> Trainer:
+                wandb_config=None,wandb_metadata=None,max_steps=-1) -> Trainer:
     has_eval_dataset = eval_dataset is not None
     if eval_dataset is None:
         eval_dataset = dataset
@@ -314,13 +339,14 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
     compute_metrics_func = get_compute_func(model_type)
     wandb_metadata = wandb_metadata or {}
     report_to = get_wandb_report_to(wandb_config)
-    run_name = wandb_metadata.get("name") if report_to == "wandb" else None
+    wandb_enabled = report_to == "wandb"
+    run_name = wandb_metadata.get("name") if wandb_enabled else None
     prepare_wandb_environment(wandb_config, wandb_metadata)
 
     args = get_training_args(learning_rate, per_device_train_batch_size, per_device_eval_batch_size, eval_accumulation_steps, num_train_epochs, 
                              load_best_model_at_end, output_dir, metric_for_best_model, eval_mode,save_stratagy,number_of_steps,save_total_limit,
                              eval_steps=eval_steps,logging_steps=logging_steps,
-                             has_eval_dataset=has_eval_dataset,report_to=report_to,run_name=run_name)
+                             has_eval_dataset=has_eval_dataset,report_to="none",run_name=run_name,max_steps=max_steps)
     
 
     trainer = trainer_type(
@@ -342,8 +368,8 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
             )
         )
     logged_config = wandb_metadata.get("config")
-    if report_to == "wandb" and logged_config:
-        trainer.add_callback(WandbConfigCallback(logged_config))
+    if wandb_enabled:
+        trainer.add_callback(WandbMetricsCallback(logged_config))
     return trainer
 
 def get_evaluation_strategy(load_best_at_end, has_eval_dataset, save_stratagy, eval_steps):
@@ -366,7 +392,7 @@ def _resolve_step_value(value, default=-1):
 
 def get_training_args(learning_rate, per_device_train_batch_size, per_device_eval_batch_size, eval_accumulation_steps, num_train_epochs,
                        load_best_at_end, output_dir, metric_for_best_model, eval_mode,save_stratagy,number_of_steps,save_total_limit,
-                       eval_steps=None,logging_steps=None,has_eval_dataset=False,report_to="none",run_name=None):
+                       eval_steps=None,logging_steps=None,has_eval_dataset=False,report_to="none",run_name=None,max_steps=-1):
     # TODO: constants
     resolved_eval_steps = _resolve_step_value(eval_steps, default=number_of_steps)
     resolved_logging_steps = _resolve_step_value(logging_steps, default=-1)
@@ -382,6 +408,8 @@ def get_training_args(learning_rate, per_device_train_batch_size, per_device_eva
     if resolved_logging_steps > 0:
         extra_params["logging_steps"] = resolved_logging_steps
         extra_params["logging_strategy"] = "steps"
+    if max_steps is not None and int(max_steps) > 0:
+        extra_params["max_steps"] = int(max_steps)
     if eval_mode:
         args = TrainingArguments(
             output_dir=output_dir,
@@ -401,7 +429,8 @@ def get_training_args(learning_rate, per_device_train_batch_size, per_device_eva
             dataloader_num_workers=4,
             dataloader_prefetch_factor=3,
             bf16=True,
-            weight_decay=0.15
+            weight_decay=0.15,
+            **extra_params,
         )
     else:
         args = TrainingArguments(

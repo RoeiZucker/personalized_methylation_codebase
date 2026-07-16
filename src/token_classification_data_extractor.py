@@ -84,6 +84,35 @@ def _save_dataset(dataset, save_path, verbose):
     dataset.save_to_disk(save_path, num_proc=1)
 
 
+def _has_eval_dataset(eval_size):
+    return eval_size is not None and eval_size > 0
+
+
+def _validate_eval_dataset_params(paths, eval_size):
+    if eval_size is None:
+        return
+    if eval_size < 0 or eval_size >= 1:
+        raise ValueError("eval_size must be greater than or equal to 0 and smaller than 1")
+    if _has_eval_dataset(eval_size) and paths.get("hf_dataset_eval_path", None) is None:
+        raise ValueError("eval_size was provided but paths.hf_dataset_eval_path is missing")
+
+
+def _split_test_eval_dataset(test_ds, eval_size, random_state):
+    split = test_ds.train_test_split(test_size=eval_size, seed=random_state)
+    return split["train"], split["test"]
+
+
+def _save_test_eval_datasets(test_ds, paths, eval_size, random_state, verbose):
+    _validate_eval_dataset_params(paths, eval_size)
+    if not _has_eval_dataset(eval_size):
+        _save_dataset(test_ds, paths["hf_dataset_test_path"], verbose)
+        return
+
+    test_ds, eval_ds = _split_test_eval_dataset(test_ds, eval_size, random_state)
+    _save_dataset(test_ds, paths["hf_dataset_test_path"], verbose)
+    _save_dataset(eval_ds, paths["hf_dataset_eval_path"], verbose)
+
+
 def _create_token_classification_hf_datasets(
     task,
     paths,
@@ -91,6 +120,7 @@ def _create_token_classification_hf_datasets(
     train_test_seperation_type,
     blank_label,
     test_size,
+    eval_size,
     random_state,
     kmer_size,
     seq_size,
@@ -123,7 +153,7 @@ def _create_token_classification_hf_datasets(
         _save_dataset(encoded_train, paths["hf_dataset_train_path"], verbose)
         if test_size > 0:
             encoded_test = _tokenize_dataset(test_ds, tokenizer)
-            _save_dataset(encoded_test, paths["hf_dataset_test_path"], verbose)
+            _save_test_eval_datasets(encoded_test, paths, eval_size, random_state, verbose)
         return resolved_binning
 
     train_ds = _load_token_dataset(task, paths["intermediate_train_data_path"], kmer_size, seq_size)
@@ -143,7 +173,7 @@ def _create_token_classification_hf_datasets(
         test_ds = _load_token_dataset(task, paths["intermediate_test_data_path"], kmer_size, seq_size)
         test_ds = apply_token_label_binning_to_dataset(test_ds, resolved_binning)
         encoded_test = _tokenize_dataset(test_ds, tokenizer)
-        _save_dataset(encoded_test, paths["hf_dataset_test_path"], verbose)
+        _save_test_eval_datasets(encoded_test, paths, eval_size, random_state, verbose)
     return resolved_binning
 
 
@@ -226,6 +256,7 @@ def encode_cpg_token_classification_extraction(cfg):
     paths = cfg["paths"]
     verbose = cfg.get("verbose", True)
     test_size = task.get("test_size", 0.2)
+    eval_size = task.get("eval_size", 0)
     train_only = test_size == 0
 
     if os.path.exists(paths["hf_dataset_train_path"]) and not task.get("override_dataset", False):
@@ -246,6 +277,7 @@ def encode_cpg_token_classification_extraction(cfg):
         train_test_seperation_type=task.get("train_test_seperation", None),
         blank_label=task["blank_label"],
         test_size=test_size,
+        eval_size=eval_size,
         random_state=cfg.get("random_state", 42),
         kmer_size=task.get("kmer_size", INSTADEEP_KMER_SIZE),
         seq_size=task["seq_size"],

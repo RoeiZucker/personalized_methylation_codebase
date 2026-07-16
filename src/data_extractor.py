@@ -84,6 +84,7 @@ def combine_seperated_dfs_to_train_test(test_size, random_state, group_a_df, gro
     test_df = pd.concat([test_df_group_a,test_df_group_b])
     return train_df,test_df
 
+
 def create_cpg_window_files(raw_files_paths, chroms, full_position_column_name, test_size, random_state, train_path, test_path,
                             variability_type,variant_seperation_type,variant_seperation_threshold,window_seperation_type,
                             window_seperation_threshold, output_per_variant_data, output_window_data,per_variant_data_path,seq_size,verbose):
@@ -214,7 +215,6 @@ def extract_data(cfg: dict) -> None:
     if task.get("clear_generator_cache", False):
         shutil.rmtree(paths["generetor_cache_dir"], ignore_errors=True)
     if task["type"] == CPG_EXTRACTION_TASK_NAME:
-        # NOTE: This was changed so it only recieves cfg, need to test
         return encode_cpg_extraction(cfg)
     elif task["type"] == CPG_SEPERATING_SITES_TASK_NAME:
         return encode_cpg_window_files_extraction(cfg)
@@ -267,7 +267,7 @@ def encode_cpg_extraction(cfg):
     windowing_type = task.get("window_type",None)
     chrom_dict = load_chrom_dict(cfg, task) #TODO: move to interal function, change so it does not recieve cfg or task
     test_size = task.get("test_size", 0.2)
-    test_size = task.get("test_size", 0.2)
+    eval_size = task.get("eval_size", 0)
     random_state = cfg.get("random_state", 42)
     shuffle = task.get("shuffle", True)
     seq_size = task["seq_size"]
@@ -284,7 +284,6 @@ def encode_cpg_extraction(cfg):
     output_preprocessed_data = task.get("output_preprocessed_data",False)
     train_window_names_path = paths.get("train_window_names_path",None)
     test_window_names_path = paths.get("test_window_names_path",None)
-    preprocessed_df = None
     output_intermediate_data = task["output_intermediate_data"]
     output_hf_dataset = task["output_hf_dataset"]
     variant_file_path =  paths.get("variant_file_path",None)
@@ -302,17 +301,7 @@ def encode_cpg_extraction(cfg):
     test_mode = testing_params["test_mode"]
     raw_data_top_rows = testing_params.get("raw_data_top_rows",-1)
 
-    # TODO: extract to function
-    variability_dict = None
-    if use_variant_filtering:
-        df = pd.read_csv(variant_file_path)
-        variability_dict = df[[DEFAULT_FULL_POSITION_COLUMN_NAME,"std"]].set_index("full_position").to_dict(orient="index")
-        for key in variability_dict.keys():
-            variability_dict[key] = variability_dict[key]["std"]
-        if verbose:
-            print("finished loading variability dict",flush=True)
-
-    # TODO: make sure this works:
+    variability_dict = load_variability_dict(variant_file_path, use_variant_filtering,verbose)
     # train_only = (test_size == 0) and (train_test_seperation_type == RANDOM_SAMPLE_TRAIN_TEST_FILTRATION)
     train_only = (test_size == 0)
 
@@ -353,10 +342,12 @@ def encode_cpg_extraction(cfg):
                 intermediate_test_data_path=paths["intermediate_test_data_path"],
                 hf_dataset_train_path=paths["hf_dataset_train_path"],
                 hf_dataset_test_path=paths["hf_dataset_test_path"],
+                hf_dataset_eval_path=paths.get("hf_dataset_eval_path", None),
                 tokenizer=tokenizer,
                 train_test_seperation_type=train_test_seperation_type,
                 blank_label=blank_label,
                 test_size=test_size,
+                eval_size=eval_size,
                 random_state=random_state,
                 kmer_size=kmer_size,
                 seq_size=seq_size,
@@ -384,13 +375,53 @@ def encode_cpg_extraction(cfg):
                 print("saving test dataset to:",paths["hf_dataset_test_path"],flush=True)
             encoded_train.save_to_disk(paths["hf_dataset_train_path"], num_proc=1)
             if test_size > 0:
-                encoded_test.save_to_disk(paths["hf_dataset_test_path"], num_proc=1)
+                save_encoded_test_eval_datasets(encoded_test, paths, eval_size, random_state, verbose)
             return
             
         save_huggingface_dataset(paths["intermediate_train_data_path"], paths["hf_dataset_train_path"], tokenizer,kmer_size,seq_size,verbose)
         if not train_only:
+            if has_eval_dataset(eval_size):
+                dataset = Dataset.from_generator(dataset_generator_wrapper(paths["intermediate_test_data_path"], DATASET_BATCH_SIZE,kmer_size,seq_size))
+                encoded_test = dataset.map(lambda examples: tokenizer(examples['seq'])).remove_columns(['seq'])
+                save_encoded_test_eval_datasets(encoded_test, paths, eval_size, random_state, verbose)
+            else:
+                save_huggingface_dataset(paths["intermediate_test_data_path"], paths["hf_dataset_test_path"], tokenizer,kmer_size,seq_size,verbose)
 
-            save_huggingface_dataset(paths["intermediate_test_data_path"], paths["hf_dataset_test_path"], tokenizer,kmer_size,seq_size,verbose)
+def load_variability_dict(variant_file_path, use_variant_filtering, verbose):
+    variability_dict = None
+    if use_variant_filtering:
+        df = pd.read_csv(variant_file_path)
+        variability_dict = df[[DEFAULT_FULL_POSITION_COLUMN_NAME,"std"]].set_index("full_position").to_dict(orient="index")
+        for key in variability_dict.keys():
+            variability_dict[key] = variability_dict[key]["std"]
+        if verbose:
+            print("finished loading variability dict",flush=True)
+    return variability_dict
+
+def has_eval_dataset(eval_size):
+    return eval_size is not None and eval_size > 0
+
+
+def validate_eval_dataset_params(paths, eval_size):
+    if eval_size is None:
+        return
+    if eval_size < 0 or eval_size >= 1:
+        raise ValueError("eval_size must be greater than or equal to 0 and smaller than 1")
+    if has_eval_dataset(eval_size) and paths.get("hf_dataset_eval_path", None) is None:
+        raise ValueError("eval_size was provided but paths.hf_dataset_eval_path is missing")
+
+
+def save_encoded_test_eval_datasets(encoded_test, paths, eval_size, random_state, verbose):
+    validate_eval_dataset_params(paths, eval_size)
+    if not has_eval_dataset(eval_size):
+        encoded_test.save_to_disk(paths["hf_dataset_test_path"], num_proc=1)
+        return
+    split = encoded_test.train_test_split(test_size=eval_size, seed=random_state)
+    if verbose:
+        print("saving eval dataset to:",paths["hf_dataset_eval_path"],flush=True)
+    split["train"].save_to_disk(paths["hf_dataset_test_path"], num_proc=1)
+    split["test"].save_to_disk(paths["hf_dataset_eval_path"], num_proc=1)
+
 
 def map_seperate_window_labels_wrapper(empty_label, p,random_seed):
     def apply_seperate_window_labels(row):

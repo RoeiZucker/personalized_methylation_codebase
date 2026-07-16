@@ -19,11 +19,37 @@ def save_tissue_huggingface_dataset(dataframe_path, save_path, tokenizer, kmer_s
         )
     )
     encoded_dataset = dataset.map(lambda examples: tokenizer(examples["seq"])).remove_columns(["seq"])
+    save_encoded_tissue_dataset(encoded_dataset, save_path, verbose)
 
+
+def save_encoded_tissue_dataset(dataset, save_path, verbose):
     if verbose:
         print("saving dataset to:", save_path, flush=True)
+    dataset.save_to_disk(save_path, num_proc=1)
 
-    encoded_dataset.save_to_disk(save_path, num_proc=1)
+
+def has_eval_dataset(eval_size):
+    return eval_size is not None and eval_size > 0
+
+
+def validate_eval_dataset_params(hf_dataset_eval_path, eval_size):
+    if eval_size is None:
+        return
+    if eval_size < 0 or eval_size >= 1:
+        raise ValueError("eval_size must be greater than or equal to 0 and smaller than 1")
+    if has_eval_dataset(eval_size) and hf_dataset_eval_path is None:
+        raise ValueError("eval_size was provided but hf_dataset_eval_path is missing")
+
+
+def save_test_eval_tissue_datasets(test_ds, hf_dataset_test_path, hf_dataset_eval_path, eval_size, random_state, verbose):
+    validate_eval_dataset_params(hf_dataset_eval_path, eval_size)
+    if not has_eval_dataset(eval_size):
+        save_encoded_tissue_dataset(test_ds, hf_dataset_test_path, verbose)
+        return
+
+    split = test_ds.train_test_split(test_size=eval_size, seed=random_state)
+    save_encoded_tissue_dataset(split["train"], hf_dataset_test_path, verbose)
+    save_encoded_tissue_dataset(split["test"], hf_dataset_eval_path, verbose)
 
 
 def create_tissue_huggingface_datasets(
@@ -32,10 +58,12 @@ def create_tissue_huggingface_datasets(
     intermediate_test_data_path,
     hf_dataset_train_path,
     hf_dataset_test_path,
+    hf_dataset_eval_path,
     tokenizer,
     train_test_seperation_type,
     blank_label,
     test_size,
+    eval_size,
     random_state,
     kmer_size,
     seq_size,
@@ -67,9 +95,11 @@ def create_tissue_huggingface_datasets(
         if verbose:
             print("saving train dataset to:", hf_dataset_train_path, flush=True)
             print("saving test dataset to:", hf_dataset_test_path, flush=True)
+            if has_eval_dataset(eval_size):
+                print("saving eval dataset to:", hf_dataset_eval_path, flush=True)
         encoded_train.save_to_disk(hf_dataset_train_path, num_proc=1)
         if test_size > 0:
-            encoded_test.save_to_disk(hf_dataset_test_path, num_proc=1)
+            save_test_eval_tissue_datasets(encoded_test, hf_dataset_test_path, hf_dataset_eval_path, eval_size, random_state, verbose)
         return
 
     save_tissue_huggingface_dataset(
@@ -82,12 +112,21 @@ def create_tissue_huggingface_datasets(
         tissue_id=tissue_id,
     )
     if not train_only:
-        save_tissue_huggingface_dataset(
-            intermediate_test_data_path,
+        dataset = Dataset.from_generator(
+            dataset_generator_wrapper(
+                intermediate_test_data_path,
+                DATASET_BATCH_SIZE,
+                kmer_size,
+                seq_size,
+                tissue_id=tissue_id,
+            )
+        )
+        encoded_dataset = dataset.map(lambda examples: tokenizer(examples["seq"])).remove_columns(["seq"])
+        save_test_eval_tissue_datasets(
+            encoded_dataset,
             hf_dataset_test_path,
-            tokenizer,
-            kmer_size,
-            seq_size,
+            hf_dataset_eval_path,
+            eval_size,
+            random_state,
             verbose,
-            tissue_id=tissue_id,
         )

@@ -95,6 +95,8 @@ def run_training(cfg: Dict[str, Any] | str):
     number_of_steps = train_config.get("number_of_steps",-1)
     eval_steps = train_config.get("eval_steps",None)
     logging_steps = train_config.get("logging_steps",None)
+    max_steps = train_config.get("max_steps",-1)
+    eval_on_start = train_config.get("eval_on_start", False)
     save_total_limit = train_config.get("save_total_limit",-1)
     load_dataset_to_memory = train_config.get("load_dataset_to_memory",False)
     # TODO: if save stratagy is steps and number of steps is -1 raise error
@@ -115,13 +117,13 @@ def run_training(cfg: Dict[str, Any] | str):
                     metric_for_best_model,resample_rate,testing_mode,top_rows,continue_from_last,
                     save_stratagy,number_of_steps,save_total_limit,eval_steps,logging_steps,add_epoch_end_save_callback,
                     add_epoch_end_prediction,load_dataset_to_memory,min_number_of_cpg_sites,verbose,label_transform,
-                    wandb_config,wandb_metadata)
+                    wandb_config,wandb_metadata,max_steps,eval_on_start)
     elif task_type == CPG_RETRAINING_TASK_TYPE:
         cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_repo, use_lora,lora_over_finetuned, num_labels, train_dataset_path, eval_dataset_path, 
             trained_model_path, model_type, output_dir, per_device_train_batch_size, per_device_eval_batch_size, learning_rate, 
             num_train_epochs, load_best_model_at_end, metric_for_best_model, resample_rate,save_stratagy,number_of_steps,save_total_limit,
             eval_steps,logging_steps,add_epoch_end_save_callback,add_epoch_end_prediction,load_dataset_to_memory,min_number_of_cpg_sites,verbose,label_transform,
-            wandb_config,wandb_metadata)
+            wandb_config,wandb_metadata,max_steps,eval_on_start)
 
     else:
         ValueError(f"Unknown task type: {task_type}")
@@ -134,7 +136,7 @@ def cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_
                    per_device_eval_batch_size, learning_rate, num_train_epochs, load_best_model_at_end, 
                    metric_for_best_model, resample_rate,save_stratagy,number_of_steps,save_total_limit,
                    eval_steps=None,logging_steps=None,add_epoch_end_save_callback=False,add_epoch_end_prediction=True,load_dataset_to_memory=False,
-                   min_number_of_cpg_sites=-1,verbose=False,label_transform="none",wandb_config=None,wandb_metadata=None):
+                   min_number_of_cpg_sites=-1,verbose=False,label_transform="none",wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False):
     if verbose:
         print("started retraining for model at path",trained_model_path,flush=True)
     eval_dataset, train_dataset = get_datasets(
@@ -179,10 +181,12 @@ def cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_
                             add_epoch_end_prediction=add_epoch_end_prediction,
                             prediction_metadata_dataset=prediction_metadata_dataset,
                             wandb_config=wandb_config,
-                            wandb_metadata=wandb_metadata)
+                            wandb_metadata=wandb_metadata,
+                            max_steps=max_steps)
     
-    if len(os.listdir(output_dir)) == 0:
+    if is_output_dir_empty(output_dir):
         continue_from_last = False
+    evaluate_before_training(trainer, eval_on_start, continue_from_last)
     trainer.train(resume_from_checkpoint=continue_from_last)
 
 def get_datasets(train_dataset_path, eval_dataset_path, top_rows, load_dataset_to_memory, label_transform="none", verbose=False):
@@ -203,6 +207,21 @@ def get_datasets(train_dataset_path, eval_dataset_path, top_rows, load_dataset_t
             dataset_name="evaluation dataset",
         )
     return eval_dataset,train_dataset
+
+
+def evaluate_before_training(trainer, eval_on_start, continue_from_last):
+    if not eval_on_start:
+        return
+    if continue_from_last:
+        print("skipping eval_on_start because training is resuming from a checkpoint", flush=True)
+        return
+    print("running initial evaluation before training", flush=True)
+    trainer.evaluate()
+
+
+def is_output_dir_empty(output_dir):
+    return not os.path.isdir(output_dir) or len(os.listdir(output_dir)) == 0
+
 
 def filter_dataset_by_min_cpg_sites(dataset, min_number_of_cpg_sites, verbose=False, dataset_name="train"):
     if dataset is None or min_number_of_cpg_sites == -1:
@@ -266,7 +285,7 @@ def cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, tra
                     metric_for_best_model,resample_rate,testing_mode,top_rows,continue_from_last,
                     save_stratagy,number_of_steps,save_total_limit,eval_steps=None,logging_steps=None,add_epoch_end_save_callback=False,
                     add_epoch_end_prediction=True,load_dataset_to_memory=False,min_number_of_cpg_sites=-1,verbose=False,label_transform="none",
-                    wandb_config=None,wandb_metadata=None):
+                    wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False):
     if verbose:
         print("started training for",model_name,flush=True)
 
@@ -301,11 +320,13 @@ def cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, tra
         add_epoch_end_prediction=add_epoch_end_prediction,
         prediction_metadata_dataset=prediction_metadata_dataset,
         wandb_config=wandb_config,
-        wandb_metadata=wandb_metadata)
+        wandb_metadata=wandb_metadata,
+        max_steps=max_steps)
     
     # in case this is the first run
-    if len(os.listdir(output_dir)) == 0:
+    if is_output_dir_empty(output_dir):
         continue_from_last = False
+    evaluate_before_training(trainer, eval_on_start, continue_from_last)
     trainer.train(resume_from_checkpoint=continue_from_last)
 
     
