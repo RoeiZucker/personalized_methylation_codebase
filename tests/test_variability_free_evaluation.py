@@ -541,14 +541,16 @@ def create_variability_bins_compare_dicts():
 def write_variability_file(path):
     pd.DataFrame(
         {
-            "full_position": ["chr1:10-12", "chr1:20-22", "chr1:30-32", "chr1:40-42"],
+            # CpG coordinates are deliberately offset from token starts.
+            "full_position": ["chr1:12-14", "chr1:22-24", "chr1:32-34", "chr1:42-44"],
             "std": [0.1, 0.2, 0.7, 0.9],
         }
     ).to_csv(path, index=False)
 
 
-def create_legacy_variability_bins_expected(result_files_path, variability_file_path, compare_dicts):
+def create_offset_matched_variability_bins_expected(result_files_path, variability_file_path, compare_dicts):
     variability_file = pd.read_csv(variability_file_path)
+    variability_lookup = variability_bins_evaluator.create_variability_std_lookup(variability_file)
     expected = {}
     std_max = variability_file["std"].max()
     for result_file_path in result_files_path:
@@ -560,12 +562,10 @@ def create_legacy_variability_bins_expected(result_files_path, variability_file_
             compare_dicts,
             [0, 0.2, 0.8, 1],
         )
-        new_result_file["full_position"] = (
-            new_result_file["chrom"]
-            + ":"
-            + new_result_file["genomic_position"].astype(str)
-            + "-"
-            + (new_result_file["genomic_position"] + 2).astype(str)
+        new_result_file = new_result_file.copy()
+        new_result_file["variability_std"] = variability_bins_evaluator.create_variability_std_values(
+            new_result_file,
+            variability_lookup,
         )
         curr_result_eval["all_results"] = variability_bins_evaluator.create_eval_object(
             new_result_file,
@@ -576,10 +576,12 @@ def create_legacy_variability_bins_expected(result_files_path, variability_file_
         for i in range(2):
             low = (std_max / 2) * i
             high = (std_max / 2) * (i + 1)
-            filtered = variability_file[(variability_file["std"] > low) & (variability_file["std"] <= high)]
-            filtered_data = new_result_file[new_result_file["full_position"].isin(set(filtered["full_position"]))]
+            if i == 0:
+                bin_mask = (new_result_file["variability_std"] >= low) & (new_result_file["variability_std"] <= high)
+            else:
+                bin_mask = (new_result_file["variability_std"] > low) & (new_result_file["variability_std"] <= high)
             curr_result_eval[f"{low}-{high}"] = variability_bins_evaluator.create_eval_object(
-                filtered_data,
+                new_result_file[bin_mask],
                 "mean_label",
                 "predicted_class",
                 [0, 1, 2],
@@ -598,7 +600,7 @@ def test_variability_bins_evaluation_cache_matches_legacy_per_file_mean_label_ca
     compare_dicts = create_variability_bins_compare_dicts()
     result_files_path = [str(first_result_file), str(second_result_file)]
 
-    expected = create_legacy_variability_bins_expected(
+    expected = create_offset_matched_variability_bins_expected(
         result_files_path,
         str(variability_file_path),
         compare_dicts,

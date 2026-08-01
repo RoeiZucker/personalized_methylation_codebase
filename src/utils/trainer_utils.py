@@ -330,8 +330,9 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
                 eval_accumulation_steps=4,num_train_epochs=2,load_best_model_at_end=False,eval_dataset=None,output_dir = "/cs/usr/roeizucker/new_storage/junk",
                 metric_for_best_model=None,eval_mode = True,save_stratagy="epoch",number_of_steps=-1,save_total_limit=-1,
                 eval_steps=None,logging_steps=None,
-                add_epoch_end_save_callback=False,add_epoch_end_prediction=True,prediction_metadata_dataset=None,
-                wandb_config=None,wandb_metadata=None,max_steps=-1) -> Trainer:
+                add_epoch_end_save_callback=False,add_epoch_end_prediction=True,
+                wandb_config=None,wandb_metadata=None,max_steps=-1,bf16=True,
+                eval_metadata_dataset=None,test_dataset=None,test_metadata_dataset=None) -> Trainer:
     has_eval_dataset = eval_dataset is not None
     if eval_dataset is None:
         eval_dataset = dataset
@@ -346,7 +347,7 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
     args = get_training_args(learning_rate, per_device_train_batch_size, per_device_eval_batch_size, eval_accumulation_steps, num_train_epochs, 
                              load_best_model_at_end, output_dir, metric_for_best_model, eval_mode,save_stratagy,number_of_steps,save_total_limit,
                              eval_steps=eval_steps,logging_steps=logging_steps,
-                             has_eval_dataset=has_eval_dataset,report_to="none",run_name=run_name,max_steps=max_steps)
+                             has_eval_dataset=has_eval_dataset,report_to="none",run_name=run_name,max_steps=max_steps,bf16=bf16)
     
 
     trainer = trainer_type(
@@ -360,17 +361,35 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
     if add_epoch_end_save_callback:
         trainer.add_callback(EpochCheckpointCallback())
     if add_epoch_end_prediction:
-        trainer.add_callback(
-            EpochPredictionCallback(
-                trainer=trainer,
-                prediction_dataset=eval_dataset,
-                metadata_dataset=prediction_metadata_dataset if prediction_metadata_dataset is not None else eval_dataset,
-            )
+        add_epoch_prediction_callback(
+            trainer,
+            eval_dataset,
+            eval_metadata_dataset,
+            output_filename="eval_predictions.csv.gitbackup",
+        )
+        add_epoch_prediction_callback(
+            trainer,
+            test_dataset,
+            test_metadata_dataset,
+            output_filename="test_predictions.csv.gitbackup",
         )
     logged_config = wandb_metadata.get("config")
     if wandb_enabled:
         trainer.add_callback(WandbMetricsCallback(logged_config))
     return trainer
+
+def add_epoch_prediction_callback(trainer, prediction_dataset, metadata_dataset, output_filename):
+    if prediction_dataset is None or metadata_dataset is None:
+        return
+    trainer.add_callback(
+        EpochPredictionCallback(
+            trainer=trainer,
+            prediction_dataset=prediction_dataset,
+            metadata_dataset=metadata_dataset,
+            output_filename=output_filename,
+        )
+    )
+
 
 def get_evaluation_strategy(load_best_at_end, has_eval_dataset, save_stratagy, eval_steps):
     if not has_eval_dataset:
@@ -392,7 +411,7 @@ def _resolve_step_value(value, default=-1):
 
 def get_training_args(learning_rate, per_device_train_batch_size, per_device_eval_batch_size, eval_accumulation_steps, num_train_epochs,
                        load_best_at_end, output_dir, metric_for_best_model, eval_mode,save_stratagy,number_of_steps,save_total_limit,
-                       eval_steps=None,logging_steps=None,has_eval_dataset=False,report_to="none",run_name=None,max_steps=-1):
+                       eval_steps=None,logging_steps=None,has_eval_dataset=False,report_to="none",run_name=None,max_steps=-1,bf16=True):
     # TODO: constants
     resolved_eval_steps = _resolve_step_value(eval_steps, default=number_of_steps)
     resolved_logging_steps = _resolve_step_value(logging_steps, default=-1)
@@ -428,7 +447,7 @@ def get_training_args(learning_rate, per_device_train_batch_size, per_device_eva
             run_name=run_name,
             dataloader_num_workers=4,
             dataloader_prefetch_factor=3,
-            bf16=True,
+            bf16=bf16,
             weight_decay=0.15,
             **extra_params,
         )
@@ -449,7 +468,7 @@ def get_training_args(learning_rate, per_device_train_batch_size, per_device_eva
         dataloader_num_workers=40,
         dataloader_prefetch_factor=30,
         # TODO Consider removing quantization to improve performance
-        bf16=True,
+        bf16=bf16,
         weight_decay=0.15,
         **extra_params,
 

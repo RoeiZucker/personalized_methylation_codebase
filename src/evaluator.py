@@ -202,6 +202,7 @@ def evaluate_sample_predictions(variability_file_path,
         raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
 
     variability_file = pd.read_csv(variability_file_path)
+    variability_std_lookup = create_variability_std_lookup(variability_file)
     if comparison_dicts is None:
         compare_dicts = create_comparison_dicts(comparison_bigwig_files,chroms,full_pos_name)
     else:
@@ -224,16 +225,67 @@ def evaluate_sample_predictions(variability_file_path,
 
         std_max = variability_file["std"].max()
         target = number_of_bins
-        new_result_file["full_position"] = new_result_file["chrom"] + ":" + new_result_file["genomic_position"].astype(str) + "-"+ (new_result_file["genomic_position"] + 2).astype(str)
+        new_result_file = new_result_file.copy()
+        new_result_file["variability_std"] = create_variability_std_values(
+            new_result_file,
+            variability_std_lookup,
+        )
         for i in range(target):
             low = (std_max/target) * i
             high = (std_max/target) * (i+1)
-            filtered = variability_file[(variability_file["std"] > low) & (variability_file["std"] <= high)]
-            positions = set(filtered["full_position"])
-            filtered_data = new_result_file[new_result_file["full_position"].isin(positions)]
+            if i == 0:
+                bin_mask = (new_result_file["variability_std"] >= low) & (new_result_file["variability_std"] <= high)
+            else:
+                bin_mask = (new_result_file["variability_std"] > low) & (new_result_file["variability_std"] <= high)
+            filtered_data = new_result_file[bin_mask]
             eval_object = create_eval_object(filtered_data,label_a,label_b,labels)
             curr_result_eval[f"{low}-{high}"] = eval_object
     return eval_objects_dict
+
+
+def create_variability_std_lookup(variability_file):
+    variability_file = variability_file.dropna(subset=["full_position", "std"]).copy()
+    full_position_parts = variability_file["full_position"].astype(str).str.extract(
+        r"^(?P<chrom>[^:]+):(?P<variant_start>\d+)-(?P<variant_end>\d+)$"
+    )
+    variability_file["chrom"] = full_position_parts["chrom"]
+    variability_file["variant_start"] = pd.to_numeric(
+        full_position_parts["variant_start"],
+        errors="coerce",
+    )
+    variability_file["std"] = pd.to_numeric(variability_file["std"], errors="coerce")
+    variability_file = variability_file.dropna(subset=["chrom", "variant_start", "std"]).copy()
+    variability_file["variant_start"] = variability_file["variant_start"].astype(int)
+
+    variability_std_lookup = {}
+    for chrom, chrom_rows in variability_file.groupby("chrom", sort=False):
+        variability_std_lookup[chrom] = chrom_rows.groupby("variant_start")["std"].mean()
+    return variability_std_lookup
+
+
+def create_variability_std_values(result_file, variability_std_lookup):
+    std_values = pd.Series(np.nan, index=result_file.index, dtype="float64")
+    for chrom, chrom_rows in result_file.groupby("chrom", sort=False):
+        if chrom not in variability_std_lookup:
+            continue
+
+        chrom_std_lookup = variability_std_lookup[chrom]
+        summed_values = pd.Series(0.0, index=chrom_rows.index)
+        matched_counts = pd.Series(0, index=chrom_rows.index)
+        genomic_positions = chrom_rows["genomic_position"]
+
+        for offset in range(-1, 6):
+            candidate_positions = genomic_positions + offset
+            matched_positions = candidate_positions.isin(chrom_std_lookup.index)
+            candidate_stds = candidate_positions.map(chrom_std_lookup)
+            summed_values += candidate_stds.where(matched_positions, 0).fillna(0)
+            matched_counts += matched_positions.astype(int)
+
+        valid_values = matched_counts > 0
+        std_values.loc[chrom_rows.index[valid_values]] = (
+            summed_values.loc[valid_values] / matched_counts.loc[valid_values]
+        )
+    return std_values
 
 
 def load_or_create_mean_label_cache(result_file_path, compare_dicts, ranges, mean_label_cache_path):
@@ -297,6 +349,8 @@ def attach_prediction_columns(cached_labeled_result_file, result_file_path):
     )
     if merged_result_file.empty:
         raise ValueError(f"No cached positions matched prediction file: {result_file_path}")
+    if len(merged_result_file) != len(cached_labeled_result_file):
+        raise ValueError(f"Cached window IDs do not match prediction positions: {result_file_path}")
     if not merged_result_file["label"].reset_index(drop=True).equals(
         merged_result_file["prediction_file_label"].reset_index(drop=True)
     ):

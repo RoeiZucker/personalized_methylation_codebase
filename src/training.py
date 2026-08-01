@@ -76,9 +76,11 @@ def run_training(cfg: Dict[str, Any] | str):
     model_repo = model_config["model_repo"]
     freeze_model = model_config.get("freeze_model",False)
     use_lora = model_config.get("use_lora",False)
+    lora_config = model_config.get("lora")
     num_labels = model_config.get("num_labels")
     train_dataset_path = paths.get("train_dataset_path",None)
     eval_dataset_path = paths.get("eval_dataset_path",None)
+    test_dataset_path = paths.get("test_dataset_path",None)
     trained_model_path = paths.get("trained_model_path",None)
     
     model_type = model_config['model_type']
@@ -97,6 +99,7 @@ def run_training(cfg: Dict[str, Any] | str):
     logging_steps = train_config.get("logging_steps",None)
     max_steps = train_config.get("max_steps",-1)
     eval_on_start = train_config.get("eval_on_start", False)
+    bf16 = train_config.get("bf16", True)
     save_total_limit = train_config.get("save_total_limit",-1)
     load_dataset_to_memory = train_config.get("load_dataset_to_memory",False)
     # TODO: if save stratagy is steps and number of steps is -1 raise error
@@ -112,18 +115,18 @@ def run_training(cfg: Dict[str, Any] | str):
     # TODO: add verbouse prints
     if task_type == CPG_TRAINING_TASK_TYPE:
         cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, train_dataset_path, 
-                    eval_dataset_path, model_type, output_dir, per_device_train_batch_size, 
+                    eval_dataset_path, test_dataset_path , model_type, output_dir, per_device_train_batch_size, 
                     per_device_eval_batch_size, learning_rate, num_train_epochs, load_best_model_at_end, 
                     metric_for_best_model,resample_rate,testing_mode,top_rows,continue_from_last,
                     save_stratagy,number_of_steps,save_total_limit,eval_steps,logging_steps,add_epoch_end_save_callback,
                     add_epoch_end_prediction,load_dataset_to_memory,min_number_of_cpg_sites,verbose,label_transform,
-                    wandb_config,wandb_metadata,max_steps,eval_on_start)
+                    wandb_config,wandb_metadata,max_steps,eval_on_start,lora_config,bf16)
     elif task_type == CPG_RETRAINING_TASK_TYPE:
-        cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_repo, use_lora,lora_over_finetuned, num_labels, train_dataset_path, eval_dataset_path, 
+        cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_repo, use_lora,lora_over_finetuned, num_labels, train_dataset_path, eval_dataset_path,test_dataset_path, 
             trained_model_path, model_type, output_dir, per_device_train_batch_size, per_device_eval_batch_size, learning_rate, 
             num_train_epochs, load_best_model_at_end, metric_for_best_model, resample_rate,save_stratagy,number_of_steps,save_total_limit,
             eval_steps,logging_steps,add_epoch_end_save_callback,add_epoch_end_prediction,load_dataset_to_memory,min_number_of_cpg_sites,verbose,label_transform,
-            wandb_config,wandb_metadata,max_steps,eval_on_start)
+            wandb_config,wandb_metadata,max_steps,eval_on_start,lora_config,bf16)
 
     else:
         ValueError(f"Unknown task type: {task_type}")
@@ -132,16 +135,17 @@ def run_training(cfg: Dict[str, Any] | str):
 
 # NOTE: changed signiture without testing, make sure it works
 def cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_repo, use_lora,lora_over_finetuned, num_labels, train_dataset_path, 
-                   eval_dataset_path, trained_model_path, model_type, output_dir, per_device_train_batch_size, 
+                   eval_dataset_path,test_dataset_path, trained_model_path, model_type, output_dir, per_device_train_batch_size, 
                    per_device_eval_batch_size, learning_rate, num_train_epochs, load_best_model_at_end, 
                    metric_for_best_model, resample_rate,save_stratagy,number_of_steps,save_total_limit,
                    eval_steps=None,logging_steps=None,add_epoch_end_save_callback=False,add_epoch_end_prediction=True,load_dataset_to_memory=False,
-                   min_number_of_cpg_sites=-1,verbose=False,label_transform="none",wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False):
+                   min_number_of_cpg_sites=-1,verbose=False,label_transform="none",wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False,lora_config=None,bf16=True):
     if verbose:
         print("started retraining for model at path",trained_model_path,flush=True)
-    eval_dataset, train_dataset = get_datasets(
+    train_dataset, eval_dataset, test_dataset = get_datasets(
         train_dataset_path,
         eval_dataset_path,
+        test_dataset_path,
         top_rows,
         load_dataset_to_memory,
         label_transform=label_transform,
@@ -160,15 +164,17 @@ def cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_
     if resample_rate is not None and resample_rate < 1:
         shuffled_dataset = train_dataset.shuffle(seed=random_state)
         train_dataset = shuffled_dataset.select(range(int(len(shuffled_dataset) * resample_rate)))
-    prediction_metadata_dataset = eval_dataset if eval_dataset is not None else train_dataset
+    eval_metadata_dataset = eval_dataset
+    test_metadata_dataset = test_dataset
     train_dataset = prepare_dataset_for_training(train_dataset, model_type=model_type)
     eval_dataset = prepare_dataset_for_training(eval_dataset, model_type=model_type)
+    test_dataset = prepare_dataset_for_training(test_dataset, model_type=model_type)
     if use_lora and lora_over_finetuned:
         # TODO: add freeeze model parameter
-        model = get_base_model(use_lora,True,num_labels,trained_model_path)
+        model = get_base_model(use_lora,True,num_labels,trained_model_path,lora_config=lora_config)
     else:
         # TODO: add freeeze model parameter
-        model = get_fine_tuned_model(use_lora,num_labels,base_model_name,trained_model_path)
+        model = get_fine_tuned_model(use_lora,num_labels,base_model_name,trained_model_path,lora_config=lora_config)
     trainer = get_trainer(dataset=train_dataset,model=model,tokenizer=tokenizer,model_type=model_type,
                             output_dir=output_dir,eval_mode=False,num_train_epochs=num_train_epochs,
                             per_device_train_batch_size=per_device_train_batch_size,
@@ -179,34 +185,57 @@ def cpg_retraining(random_state, top_rows,continue_from_last, model_name, model_
                             eval_steps=eval_steps,logging_steps=logging_steps,
                             add_epoch_end_save_callback=add_epoch_end_save_callback,
                             add_epoch_end_prediction=add_epoch_end_prediction,
-                            prediction_metadata_dataset=prediction_metadata_dataset,
+                            eval_metadata_dataset=eval_metadata_dataset,
+                            test_dataset=test_dataset,
+                            test_metadata_dataset=test_metadata_dataset,
                             wandb_config=wandb_config,
                             wandb_metadata=wandb_metadata,
-                            max_steps=max_steps)
+                            max_steps=max_steps,
+                            bf16=bf16)
     
     if is_output_dir_empty(output_dir):
         continue_from_last = False
     evaluate_before_training(trainer, eval_on_start, continue_from_last)
     trainer.train(resume_from_checkpoint=continue_from_last)
 
-def get_datasets(train_dataset_path, eval_dataset_path, top_rows, load_dataset_to_memory, label_transform="none", verbose=False):
-    eval_dataset = None
-    train_dataset = get_dataset_for_paths(train_dataset_path, top_rows, load_dataset_to_memory)
-    train_dataset = apply_label_transform_to_dataset(
-        train_dataset,
+def get_datasets(train_dataset_path, eval_dataset_path, test_dataset_path, top_rows, load_dataset_to_memory, label_transform="none", verbose=False):
+    train_dataset = get_optional_dataset(
+        train_dataset_path,
+        top_rows,
+        load_dataset_to_memory,
+        label_transform,
+        verbose,
+        "training dataset",
+    )
+    eval_dataset = get_optional_dataset(
+        eval_dataset_path,
+        top_rows,
+        load_dataset_to_memory,
+        label_transform,
+        verbose,
+        "evaluation dataset",
+    )
+    test_dataset = get_optional_dataset(
+        test_dataset_path,
+        top_rows,
+        load_dataset_to_memory,
+        label_transform,
+        verbose,
+        "test dataset",
+    )
+    return train_dataset, eval_dataset, test_dataset
+
+
+def get_optional_dataset(dataset_path, top_rows, load_dataset_to_memory, label_transform="none", verbose=False, dataset_name="dataset"):
+    if dataset_path is None:
+        return None
+    dataset = get_dataset_for_paths(dataset_path, top_rows, load_dataset_to_memory)
+    return apply_label_transform_to_dataset(
+        dataset,
         label_transform,
         verbose=verbose,
-        dataset_name="training dataset",
+        dataset_name=dataset_name,
     )
-    if eval_dataset_path is not None:
-        eval_dataset = get_dataset_for_paths(eval_dataset_path, top_rows, load_dataset_to_memory)
-        eval_dataset = apply_label_transform_to_dataset(
-            eval_dataset,
-            label_transform,
-            verbose=verbose,
-            dataset_name="evaluation dataset",
-        )
-    return eval_dataset,train_dataset
 
 
 def evaluate_before_training(trainer, eval_on_start, continue_from_last):
@@ -280,18 +309,19 @@ def prepare_dataset_for_training(dataset, model_type="regression_analysis"):
     return dataset
 
 def cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, train_dataset_path,
-                  eval_dataset_path, model_type, output_dir, per_device_train_batch_size,
+                  eval_dataset_path,test_dataset_path, model_type, output_dir, per_device_train_batch_size,
                     per_device_eval_batch_size, learning_rate, num_train_epochs, load_best_model_at_end, 
                     metric_for_best_model,resample_rate,testing_mode,top_rows,continue_from_last,
                     save_stratagy,number_of_steps,save_total_limit,eval_steps=None,logging_steps=None,add_epoch_end_save_callback=False,
                     add_epoch_end_prediction=True,load_dataset_to_memory=False,min_number_of_cpg_sites=-1,verbose=False,label_transform="none",
-                    wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False):
+                    wandb_config=None,wandb_metadata=None,max_steps=-1,eval_on_start=False,lora_config=None,bf16=True):
     if verbose:
         print("started training for",model_name,flush=True)
 
-    eval_dataset, train_dataset = get_datasets(
+    train_dataset, eval_dataset, test_dataset = get_datasets(
         train_dataset_path,
         eval_dataset_path,
+        test_dataset_path,
         top_rows,
         load_dataset_to_memory,
         label_transform=label_transform,
@@ -303,14 +333,16 @@ def cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, tra
         verbose=verbose,
         dataset_name="train",
     )
-    prediction_metadata_dataset = eval_dataset if eval_dataset is not None else train_dataset
+    eval_metadata_dataset = eval_dataset
+    test_metadata_dataset = test_dataset
     train_dataset = prepare_dataset_for_training(train_dataset, model_type=model_type)
     eval_dataset = prepare_dataset_for_training(eval_dataset, model_type=model_type)
+    test_dataset = prepare_dataset_for_training(test_dataset, model_type=model_type)
     
     # TODO: implement resample
     base_model_name = model_repo + "/" + model_name
     tokenizer = AutoTokenizer.from_pretrained(base_model_name,trust_remote_code=True)
-    model = get_base_model(use_lora,freeze_model,num_labels,base_model_name)
+    model = get_base_model(use_lora,freeze_model,num_labels,base_model_name,lora_config=lora_config)
     trainer = get_trainer(dataset=train_dataset,model=model,tokenizer=tokenizer,model_type=model_type,
         output_dir=output_dir,eval_mode=False,num_train_epochs=num_train_epochs,
         per_device_train_batch_size=per_device_train_batch_size,per_device_eval_batch_size=per_device_eval_batch_size,
@@ -318,10 +350,13 @@ def cpg_training(model_name, model_repo, freeze_model, use_lora, num_labels, tra
         metric_for_best_model=metric_for_best_model,eval_dataset=eval_dataset,save_stratagy=save_stratagy,number_of_steps=number_of_steps,
         save_total_limit=save_total_limit,eval_steps=eval_steps,logging_steps=logging_steps,add_epoch_end_save_callback=add_epoch_end_save_callback,
         add_epoch_end_prediction=add_epoch_end_prediction,
-        prediction_metadata_dataset=prediction_metadata_dataset,
+        eval_metadata_dataset=eval_metadata_dataset,
+        test_dataset=test_dataset,
+        test_metadata_dataset=test_metadata_dataset,
         wandb_config=wandb_config,
         wandb_metadata=wandb_metadata,
-        max_steps=max_steps)
+        max_steps=max_steps,
+        bf16=bf16)
     
     # in case this is the first run
     if is_output_dir_empty(output_dir):

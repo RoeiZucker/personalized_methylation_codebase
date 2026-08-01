@@ -52,6 +52,7 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
     model_repo = model_config["model_repo"]
     freeze_model = model_config.get("freeze_model", False)
     use_lora = model_config.get("use_lora", False)
+    lora_config = model_config.get("lora")
     num_labels = model_config.get("num_labels")
     task_level = model_config.get("task_level", tissue_prompt_config.get("task_level", "token"))
     train_dataset_path = paths.get("train_dataset_path", None)
@@ -72,6 +73,7 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
     number_of_steps = train_config.get("number_of_steps", -1)
     eval_steps = train_config.get("eval_steps", None)
     logging_steps = train_config.get("logging_steps", None)
+    bf16 = train_config.get("bf16", True)
     save_total_limit = train_config.get("save_total_limit", -1)
     load_dataset_to_memory = train_config.get("load_dataset_to_memory", False)
     min_number_of_cpg_sites = train_config.get("min_number_of_cpg_sites", -1)
@@ -116,6 +118,8 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
             label_transform,
             wandb_config,
             wandb_metadata,
+            lora_config,
+            bf16,
         )
     elif task_type == CPG_RETRAINING_TASK_TYPE:
         cpg_retraining(
@@ -153,6 +157,8 @@ def run_tissue_training(cfg: Dict[str, Any] | str):
             label_transform,
             wandb_config,
             wandb_metadata,
+            lora_config,
+            bf16,
         )
     else:
         ValueError(f"Unknown task type: {task_type}")
@@ -193,6 +199,8 @@ def cpg_retraining(
     label_transform="none",
     wandb_config=None,
     wandb_metadata=None,
+    lora_config=None,
+    bf16=True,
 ):
     if verbose:
         print("started retraining for model at path", trained_model_path, flush=True)
@@ -228,6 +236,7 @@ def cpg_retraining(
             trained_model_path,
             model_type=model_type,
             tissue_prompt_config=tissue_prompt_config,
+            lora_config=lora_config,
         )
     else:
         model = get_fine_tuned_model(
@@ -237,6 +246,7 @@ def cpg_retraining(
             trained_model_path,
             model_type=model_type,
             tissue_prompt_config=tissue_prompt_config,
+            lora_config=lora_config,
         )
     trainer = get_trainer(
         dataset=train_dataset,
@@ -261,6 +271,7 @@ def cpg_retraining(
         add_epoch_end_save_callback=add_epoch_end_save_callback,
         wandb_config=wandb_config,
         wandb_metadata=wandb_metadata,
+        bf16=bf16,
     )
 
     if len(os.listdir(output_dir)) == 0:
@@ -404,6 +415,8 @@ def cpg_training(
     label_transform="none",
     wandb_config=None,
     wandb_metadata=None,
+    lora_config=None,
+    bf16=True,
 ):
     if verbose:
         print("started training for", model_name, flush=True)
@@ -438,6 +451,7 @@ def cpg_training(
         base_model_name,
         model_type=model_type,
         tissue_prompt_config=tissue_prompt_config,
+        lora_config=lora_config,
     )
     trainer = get_trainer(
         dataset=train_dataset,
@@ -462,6 +476,7 @@ def cpg_training(
         add_epoch_end_save_callback=add_epoch_end_save_callback,
         wandb_config=wandb_config,
         wandb_metadata=wandb_metadata,
+        bf16=bf16,
     )
 
     if len(os.listdir(output_dir)) == 0:

@@ -1,0 +1,26 @@
+# Create the R3 epoch-1-pretrain full sweep:
+# wandb sweep --project personalized-methylation-r3-epoch1-10k_limited_run /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_sweep_r3_epoch1_10k_limited_run.yaml
+# Then submit one Slurm array task per trial using the printed sweep id.
+program: /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py
+method: grid
+metric:
+  name: eval/loss
+  goal: minimize
+parameters:
+  learning_rate:
+    values:
+    - 5.0e-06
+    - 1.0e-05
+    - 3.0e-05
+  batch_size:
+    values:
+    - 5
+    - 14
+command:
+- python3
+- /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py
+- --base-config
+- /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training_r3_epoch1_10k_limited_run.yaml
+- --sample-name
+- Z000000R3
+- --resume

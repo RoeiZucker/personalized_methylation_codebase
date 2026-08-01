@@ -7,6 +7,14 @@ from transformers import AutoModelForTokenClassification
 from .tissue_prompt_model import SEQUENCE_TASK_LEVEL, TissuePromptModel
 
 
+DEFAULT_LORA_CONFIG = {
+    "r": 1,
+    "lora_alpha": 16,
+    "lora_dropout": 0.1,
+    "target_modules": ["query", "value"],
+}
+
+
 def _get_problem_type(model_type):
     return "regression" if model_type == "regression_analysis" else "single_label_classification"
 
@@ -46,17 +54,29 @@ def _maybe_freeze_base_model(model, freeze_model):
         param.requires_grad = False
 
 
-def _wrap_with_lora(model, use_lora, task_level):
-    if not use_lora:
-        return model
-    peft_config = LoraConfig(
+def _normalize_target_modules(value):
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return list(value)
+
+
+def _get_lora_config(task_level, lora_config=None):
+    config = dict(DEFAULT_LORA_CONFIG)
+    config.update(lora_config or {})
+    return LoraConfig(
         task_type=_get_task_type(task_level),
         inference_mode=False,
-        r=1,
-        lora_alpha=16,
-        lora_dropout=0.1,
-        target_modules=["query", "value"],
+        r=int(config["r"]),
+        lora_alpha=int(config["lora_alpha"]),
+        lora_dropout=float(config["lora_dropout"]),
+        target_modules=_normalize_target_modules(config["target_modules"]),
     )
+
+
+def _wrap_with_lora(model, use_lora, task_level, lora_config=None):
+    if not use_lora:
+        return model
+    peft_config = _get_lora_config(task_level, lora_config)
     return get_peft_model(model, peft_config)
 
 
@@ -73,6 +93,7 @@ def get_base_model(
     base_model_name: str,
     model_type: str = "regression_analysis",
     tissue_prompt_config=None,
+    lora_config=None,
 ):
     non_lora_load_kwargs = {}
     task_level = (tissue_prompt_config or {}).get("task_level", "token")
@@ -96,7 +117,7 @@ def get_base_model(
             **non_lora_load_kwargs,
         )
     _maybe_freeze_base_model(model, freeze_model)
-    return _wrap_with_lora(model, use_lora, task_level)
+    return _wrap_with_lora(model, use_lora, task_level, lora_config)
 
 
 def get_fine_tuned_model(
@@ -108,6 +129,7 @@ def get_fine_tuned_model(
     freeze_model=False,
     model_type="regression_analysis",
     tissue_prompt_config=None,
+    lora_config=None,
 ):
     if use_lora:
         print("Loading lora model from:", base_model_name)
@@ -146,14 +168,7 @@ def get_fine_tuned_model(
                 **lora_load_kwargs,
             )
         _maybe_freeze_base_model(base_model, freeze_model)
-        peft_config = LoraConfig(
-            task_type=_get_task_type(task_level),
-            inference_mode=False,
-            r=1,
-            lora_alpha=16,
-            lora_dropout=0.1,
-            target_modules=["query", "value"],
-        )
+        peft_config = _get_lora_config(task_level, lora_config)
         print()
         return PeftModel.from_pretrained(base_model, model_path, is_trainable=True, config=peft_config)
 

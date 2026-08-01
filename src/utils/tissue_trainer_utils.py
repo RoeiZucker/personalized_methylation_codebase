@@ -153,6 +153,7 @@ def get_trainer(
     task_level="token",
     wandb_config=None,
     wandb_metadata=None,
+    bf16=True,
 ) -> Trainer:
     has_eval_dataset = eval_dataset is not None
     if eval_dataset is None:
@@ -182,6 +183,7 @@ def get_trainer(
         has_eval_dataset=has_eval_dataset,
         report_to=report_to,
         run_name=run_name,
+        bf16=bf16,
     )
 
     trainer = trainer_type(
@@ -233,6 +235,7 @@ def get_training_args(
     has_eval_dataset=False,
     report_to="none",
     run_name=None,
+    bf16=True,
 ):
     resolved_eval_steps = _resolve_step_value(eval_steps, default=number_of_steps)
     resolved_logging_steps = _resolve_step_value(logging_steps, default=-1)
@@ -270,7 +273,7 @@ def get_training_args(
             run_name=run_name,
             dataloader_num_workers=4,
             dataloader_prefetch_factor=3,
-            bf16=True,
+            bf16=bf16,
         )
     else:
         args = TrainingArguments(
@@ -287,7 +290,7 @@ def get_training_args(
             run_name=run_name,
             dataloader_num_workers=120,
             dataloader_prefetch_factor=90,
-            bf16=True,
+            bf16=bf16,
             **extra_params,
         )
 

@@ -232,7 +232,7 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
                 # eval_accumulation_steps=4,num_train_epochs=2,load_best_model_at_end=False,eval_dataset=None,output_dir = "/home/users/roeizucker/tests/temp_output_panic",
                 eval_accumulation_steps=4,num_train_epochs=2,load_best_model_at_end=False,eval_dataset=None,output_dir = "/cs/usr/roeizucker/new_storage/junk",
                 metric_for_best_model=None,eval_mode = True,save_stratagy="epoch",number_of_steps=-1,save_total_limit=-1,
-                add_epoch_end_save_callback=False,add_epoch_end_prediction=True,prediction_metadata_dataset=None) -> Trainer:
+                add_epoch_end_save_callback=False,add_epoch_end_prediction=True,eval_metadata_dataset=None) -> Trainer:
     if eval_dataset is None:
         eval_dataset = dataset
     trainer_type = get_trainer_type(model_type)
@@ -257,7 +257,7 @@ def get_trainer(dataset, model, tokenizer,model_type,learning_rate=1e-5,per_devi
             EpochPredictionCallback(
                 trainer=trainer,
                 prediction_dataset=eval_dataset,
-                metadata_dataset=prediction_metadata_dataset if prediction_metadata_dataset is not None else eval_dataset,
+                metadata_dataset=eval_metadata_dataset,
             )
         )
     return trainer

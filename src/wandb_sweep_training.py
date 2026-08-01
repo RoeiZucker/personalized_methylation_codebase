@@ -5,6 +5,14 @@
 # python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_training.yaml --sample-name R3 --wandb-run-id R3-sweep-001 --resume
 # Example explicit hyperparameter reconnect run:
 # python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training.yaml --sample-name Z000000R3 --wandb-run-id cjfqy9u7 --resume --learning-rate 1e-6 --batch-size 1
+# Example explicit LoRA override run:
+# python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training.yaml --sample-name Z000000R3 --wandb-run-id lora-r4-alpha16 --resume --learning-rate 1e-5 --batch-size 5 --lora-r 4 --lora-alpha 16 --lora-dropout 0.1 --lora-target-modules query,value
+# Example short top-rows LoRA debug run:
+# python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training_r3_epoch10_lora_10k_limited_run.yaml --sample-name Z000000R3 --wandb-run-id r3-e10-lora-r4-top5000-debug --learning-rate 1e-5 --batch-size 14 --top-rows 5000 --lora-r 4 --lora-alpha 16 --lora-dropout 0.1 --lora-target-modules query,value
+# Example explicit downsampled-dataset run:
+# python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training_r3_10k_limited_run.yaml --sample-name R3-ratio1p0 --wandb-run-id r3-downsample-1p0-lr1e5-bs30 --project personalized-methylation-r3-downsampled-epoch10-bs30 --group r3-downsampled-epoch10-bs30 --learning-rate 1e-5 --batch-size 30 --eval-steps 1000 --logging-steps 333 --train-dataset-path /sci/labs/michall/roeizucker/roei_test/token_cls_datasets_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z000000R3_retrain_token_cls_Liver-Hepatocytes_kmer_seq_5400_datasets_train_ratio_1p0
+# Example no-start-eval smoke run:
+# python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_full_training_r3_10k_limited_run.yaml --sample-name R3-smoke-ratio1p0 --wandb-run-id r3-downsample-smoke-1p0-bs1-2k --project personalized-methylation-r3-downsampled-smoke --group r3-downsampled-smoke-bs1-2k --learning-rate 1e-5 --batch-size 1 --max-steps 2000 --eval-steps 200 --logging-steps 200 --no-eval-on-start --train-dataset-path /sci/labs/michall/roeizucker/roei_test/token_cls_datasets_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z000000R3_retrain_token_cls_Liver-Hepatocytes_kmer_seq_5400_datasets_train_ratio_1p0
 # Example dry-run validation:
 # python3 /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/src/wandb_sweep_training.py --base-config /cs/usr/roeizucker/new_storage/jupyter_notebooks/Tom_Hope_Project/refactored_code/configs/wandb_classification_training.yaml --sample-name R3 --mode disabled --wandb-run-id dry-run-r3 --resume --dry-run
 # Example W&B sweep agent use:
@@ -73,6 +81,28 @@ def set_use_lora(cfg: Dict[str, Any], value: Any) -> None:
     cfg["model"]["use_lora"] = parse_bool(value)
 
 
+def set_lora_value(cfg: Dict[str, Any], key: str, value: Any) -> None:
+    cfg["model"].setdefault("lora", {})[key] = value
+
+
+def set_lora_r(cfg: Dict[str, Any], value: Any) -> None:
+    set_lora_value(cfg, "r", int(value))
+
+
+def set_lora_alpha(cfg: Dict[str, Any], value: Any) -> None:
+    set_lora_value(cfg, "lora_alpha", int(value))
+
+
+def set_lora_dropout(cfg: Dict[str, Any], value: Any) -> None:
+    set_lora_value(cfg, "lora_dropout", float(value))
+
+
+def set_lora_target_modules(cfg: Dict[str, Any], value: Any) -> None:
+    if isinstance(value, str):
+        value = [item.strip() for item in value.split(",") if item.strip()]
+    set_lora_value(cfg, "target_modules", list(value))
+
+
 def set_min_cpg_sites(cfg: Dict[str, Any], value: Any) -> None:
     cfg["train"]["min_number_of_cpg_sites"] = int(value)
 
@@ -88,6 +118,22 @@ def set_save_total_limit(cfg: Dict[str, Any], value: Any) -> None:
 
 def set_max_steps(cfg: Dict[str, Any], value: Any) -> None:
     cfg["train"]["max_steps"] = int(value)
+
+
+def set_eval_steps(cfg: Dict[str, Any], value: Any) -> None:
+    cfg["train"]["eval_steps"] = int(value)
+
+
+def set_logging_steps(cfg: Dict[str, Any], value: Any) -> None:
+    cfg["train"]["logging_steps"] = int(value)
+
+
+def set_train_dataset_path(cfg: Dict[str, Any], value: Any) -> None:
+    cfg["paths"]["train_dataset_path"] = [str(value)]
+
+
+def set_eval_on_start(cfg: Dict[str, Any], value: Any) -> None:
+    cfg["train"]["eval_on_start"] = parse_bool(value)
 
 
 def parse_bool(value: Any) -> bool:
@@ -112,11 +158,19 @@ def get_sweep_appliers() -> Dict[str, SweepApplier]:
         "top_rows": set_top_rows,
         "freeze_model": set_freeze_model,
         "use_lora": set_use_lora,
+        "lora_r": set_lora_r,
+        "lora_alpha": set_lora_alpha,
+        "lora_dropout": set_lora_dropout,
+        "lora_target_modules": set_lora_target_modules,
         "min_number_of_cpg_sites": set_min_cpg_sites,
         "save_steps": set_save_steps,
         "number_of_steps": set_save_steps,
         "save_total_limit": set_save_total_limit,
         "max_steps": set_max_steps,
+        "eval_steps": set_eval_steps,
+        "logging_steps": set_logging_steps,
+        "train_dataset_path": set_train_dataset_path,
+        "eval_on_start": set_eval_on_start,
     }
 
 
@@ -128,6 +182,24 @@ def get_cli_sweep_params(args: argparse.Namespace) -> Dict[str, Any]:
         params["batch_size"] = args.batch_size
     if args.max_steps is not None:
         params["max_steps"] = args.max_steps
+    if args.eval_steps is not None:
+        params["eval_steps"] = args.eval_steps
+    if args.logging_steps is not None:
+        params["logging_steps"] = args.logging_steps
+    if args.train_dataset_path is not None:
+        params["train_dataset_path"] = args.train_dataset_path
+    if args.eval_on_start is not None:
+        params["eval_on_start"] = args.eval_on_start
+    if args.top_rows is not None:
+        params["top_rows"] = args.top_rows
+    if args.lora_r is not None:
+        params["lora_r"] = args.lora_r
+    if args.lora_alpha is not None:
+        params["lora_alpha"] = args.lora_alpha
+    if args.lora_dropout is not None:
+        params["lora_dropout"] = args.lora_dropout
+    if args.lora_target_modules is not None:
+        params["lora_target_modules"] = args.lora_target_modules
     return params
 
 
@@ -159,9 +231,30 @@ def get_run_name(sample_name: str, cfg: Dict[str, Any]) -> str:
     task_prefix = get_task_prefix(cfg)
     lr = format_value(train_cfg.get("learning_rate"))
     batch_size = train_cfg.get("per_device_train_batch_size")
+    top_rows_tag = get_top_rows_tag(cfg)
+    lora_config_tag = get_lora_config_tag(model_cfg)
     freeze_tag = "frz" if model_cfg.get("freeze_model", False) else "full"
     lora_tag = "lora" if model_cfg.get("use_lora", False) else "base"
-    return sanitize_name(f"{sample_name}-{task_prefix}-lr{lr}-bs{batch_size}-{freeze_tag}-{lora_tag}")
+    return sanitize_name(
+        f"{sample_name}-{task_prefix}-lr{lr}-bs{batch_size}{top_rows_tag}{lora_config_tag}-{freeze_tag}-{lora_tag}"
+    )
+
+
+def get_top_rows_tag(cfg: Dict[str, Any]) -> str:
+    top_rows = cfg.get("task", {}).get("top_rows", -1)
+    if top_rows is None or int(top_rows) < 0:
+        return ""
+    return f"-top{int(top_rows)}"
+
+
+def get_lora_config_tag(model_cfg: Dict[str, Any]) -> str:
+    if not model_cfg.get("use_lora", False):
+        return ""
+    lora_cfg = model_cfg.get("lora") or {}
+    lora_r = lora_cfg.get("r")
+    if lora_r is None:
+        return ""
+    return f"-r{lora_r}"
 
 
 def format_value(value: Any) -> str:
@@ -201,13 +294,23 @@ def get_effective_run_id(run: Any, requested_run_id: str | None) -> str:
     return requested_run_id or run.id
 
 
-def print_dry_run_summary(cfg: Dict[str, Any], run_name: str, run_id: str) -> None:
-    print("dry run only; training was not started", flush=True)
+def print_run_summary(cfg: Dict[str, Any], run_name: str, run_id: str) -> None:
+    train_cfg = cfg["train"]
     print("wandb run id:", run_id, flush=True)
     print("run name:", run_name, flush=True)
+    print("train_dataset_path:", cfg["paths"].get("train_dataset_path"), flush=True)
     print("output_dir:", cfg["paths"].get("output_dir"), flush=True)
-    print("continue_from_last:", cfg["train"].get("continue_from_last"), flush=True)
+    print("max_steps:", train_cfg.get("max_steps"), flush=True)
+    print("eval_steps:", train_cfg.get("eval_steps"), flush=True)
+    print("logging_steps:", train_cfg.get("logging_steps"), flush=True)
+    print("eval_on_start:", train_cfg.get("eval_on_start"), flush=True)
+    print("continue_from_last:", train_cfg.get("continue_from_last"), flush=True)
     print("wandb tags:", cfg.get("wandb", {}).get("tags"), flush=True)
+
+
+def print_dry_run_summary(cfg: Dict[str, Any], run_name: str, run_id: str) -> None:
+    print("dry run only; training was not started", flush=True)
+    print_run_summary(cfg, run_name, run_id)
 
 
 def prepare_initial_wandb_environment(
@@ -283,6 +386,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float, default=None, help="Optional direct learning-rate override for explicit non-agent runs.")
     parser.add_argument("--batch-size", type=int, default=None, help="Optional direct train/eval batch-size override for explicit non-agent runs.")
     parser.add_argument("--max-steps", type=int, default=None, help="Optional direct max-steps override for explicit non-agent runs.")
+    parser.add_argument("--eval-steps", type=int, default=None, help="Optional direct eval_steps override.")
+    parser.add_argument("--logging-steps", type=int, default=None, help="Optional direct logging_steps override.")
+    parser.add_argument("--train-dataset-path", default=None, help="Optional direct training dataset path override.")
+    parser.add_argument("--eval-on-start", dest="eval_on_start", action="store_true", default=None, help="Run one evaluation before training starts.")
+    parser.add_argument("--no-eval-on-start", dest="eval_on_start", action="store_false", help="Skip the evaluation before training starts.")
+    parser.add_argument("--top-rows", type=int, default=None, help="Optional direct top_rows override for short debug runs.")
+    parser.add_argument("--lora-r", type=int, default=None, help="Optional direct LoRA rank override.")
+    parser.add_argument("--lora-alpha", type=int, default=None, help="Optional direct LoRA alpha override.")
+    parser.add_argument("--lora-dropout", type=float, default=None, help="Optional direct LoRA dropout override.")
+    parser.add_argument("--lora-target-modules", default=None, help="Comma-separated direct LoRA target module override.")
     parser.add_argument("--resume", action="store_true", help="Resume the W&B run and continue training from the last checkpoint.")
     parser.add_argument("--dry-run", action="store_true", help="Build and print the final config values without starting training.")
     return parser.parse_args()
@@ -323,6 +436,7 @@ def main() -> None:
         if args.dry_run:
             print_dry_run_summary(cfg, run_name, run_id)
             return
+        print_run_summary(cfg, run_name, run_id)
         print("starting sweep trial", run_name, "with output_dir", cfg["paths"].get("output_dir"), flush=True)
         run_training(cfg)
 
