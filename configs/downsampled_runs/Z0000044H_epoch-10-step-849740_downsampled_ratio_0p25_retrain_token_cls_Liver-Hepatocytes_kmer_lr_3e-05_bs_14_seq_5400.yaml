@@ -45,7 +45,7 @@ train:
   add_epoch_end_prediction: true
   save_at_end: false
   continue_from_last: false
-  eval_steps: 5000
+  eval_steps: -1
   logging_steps: 1000
 wandb:
   enabled: false
