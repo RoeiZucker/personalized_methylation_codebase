@@ -465,7 +465,7 @@ def get_training_args(learning_rate, per_device_train_batch_size, per_device_eva
         report_to=report_to,
         run_name=run_name,
         # TODO: make sure these numbers are normal
-        dataloader_num_workers=40,
+        dataloader_num_workers=20,
         dataloader_prefetch_factor=30,
         # TODO Consider removing quantization to improve performance
         bf16=bf16,
