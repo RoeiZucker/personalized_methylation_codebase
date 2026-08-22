@@ -50,6 +50,8 @@ def split_input_paths(paths):
 
 def infer_sample_name(prediction_file):
     for parent in prediction_file.parents:
+        if parent.name.startswith("checkpoint-") or parent.name.startswith("pretrain_"):
+            continue
         match = re.match(r"^(?P<sample>[^_]+)_", parent.name)
         if match is not None:
             return match.group("sample")

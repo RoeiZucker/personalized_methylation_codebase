@@ -6,9 +6,9 @@ paths:
   train_dataset_path:
   - /shared/cycle1_huji_linial_prj/roei_test/downsampled_datasets_all/_token_cls_Heart-Fibroblasts_kmer/Z0000041X_retrain_token_cls_Heart-Fibroblasts_kmer_seq_5400_datasets_train_ratio_0p25
   output_dir: /shared/cycle1_huji_linial_prj/roei_test/token_cls_models_downsampled/_token_cls_Heart-Fibroblasts_kmer/Z0000041X_epoch-10-step-508630_downsampled_ratio_0p25_retrain_token_cls_Heart-Fibroblasts_kmer_lr_3e-05_bs_14_seq_5400
-  eval_dataset_path: /home/users/roeizucker/tests/token_cls_datasets2_eval_test_split_all/_token_cls_Heart-Fibroblasts_kmer/Z0000041X_retrain_token_cls_Heart-Fibroblasts_kmer_seq_5400_datasets_eval
+  eval_dataset_path: null
   trained_model_path: /shared/cycle1_huji_linial_prj/roei_test/token_cls_models2/_token_cls_Heart-Fibroblasts_kmer/Z0000041X_pretrain_token_cls_Heart-Fibroblasts_kmer_lr_1e-06_bs_14_seq_5400/epoch-10-step-508630
-  test_dataset_path: /home/users/roeizucker/tests/token_cls_datasets2_eval_test_split_all/_token_cls_Heart-Fibroblasts_kmer/Z0000041X_retrain_token_cls_Heart-Fibroblasts_kmer_seq_5400_datasets_test
+  test_dataset_path: null
 task:
   task_type: cpg_retraining
   analysis_name: Z0000041X_epoch-10-step-508630_downsampled_ratio_0p25_retrain_token_cls_Heart-Fibroblasts_kmer_lr_3e-05_bs_14_seq_5400

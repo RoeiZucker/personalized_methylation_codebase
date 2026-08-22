@@ -1,0 +1,130 @@
+# Methylation k-mer browser tracks
+
+`scripts/generate_methylation_kmer_tracks.py` reads the labeled token rows in
+paired retrained and pretrained prediction files without aggregating them into
+5.4 kb windows. The validated browser interval for the current tokenizer is
+`[genomic_position, genomic_position + 6)`.
+
+## Scores and categorical states
+
+Correctness delta is retrained correctness minus baseline correctness:
+
+- `+1`: rescued — retrained correct, baseline wrong.
+- `-1`: harmed — retrained wrong, baseline correct.
+- `0`: both correct or both wrong; categorical BED tracks keep these distinct.
+
+`true_probability_delta` is the retrained probability assigned to the observed
+class minus the pretrained probability assigned to that class. It is not
+computed for the atlas (mean-label) baseline because that cache contains a
+class, not class probabilities.
+
+Tissue bedGraph values average participant results at the exact k-mer coordinate.
+The summary retains rescued, harmed, both-correct, and both-wrong participant
+counts, standard errors, label counts, and coverage.
+
+## Generate tracks
+
+Priority high-variability groups for all discovered test results:
+
+```bash
+python3 scripts/generate_methylation_kmer_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05 \
+  --output-dir scripts/results/methylation_kmer_tracks
+```
+
+A small participant/chromosome run that also writes categorical participant
+tracks:
+
+```bash
+python3 scripts/generate_methylation_kmer_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05 \
+  --output-dir scripts/results/methylation_kmer_tracks_Z0000044P_chr21 \
+  --participant Z0000044P --chrom chr21 --participant-tracks
+```
+
+An atlas-versus-retraining-only pilot with unambiguous track and item names:
+
+```bash
+python3 scripts/generate_methylation_kmer_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05 \
+  --output-dir scripts/results/methylation_kmer_tracks_Z0000044P_chr21_retrained_vs_atlas \
+  --participant Z0000044P --chrom chr21 --participant-tracks --baseline atlas
+```
+
+This writes `retrained_vs_atlas` tracks whose participant item names contain
+`atlas=<class>` and `retrain=<class>`.
+
+A tissue-level atlas comparison aggregates paired participant outcomes at each
+exact k-mer and can require a minimum participant count:
+
+```bash
+python3 scripts/generate_methylation_kmer_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05 \
+  --output-dir analysis/Heart-Cardiomyocyte_chr21_retrained_vs_atlas \
+  --tissue Heart-Cardiomyocyte --chrom chr21 --baseline atlas \
+  --min-participants-per-kmer 3
+```
+
+The complete aggregate remains in `kmer_summary.tsv.gz`.
+`browser_kmer_summary.tsv.gz` and the browser tracks contain only rows meeting
+the coverage threshold.
+
+To emit each tissue separately and a second aggregation across every selected
+sample, add `--combined-samples-track` and omit the tissue filter:
+
+```bash
+python3 scripts/generate_methylation_kmer_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05 \
+  --output-dir analysis/all_tissues_and_combined_chr21 \
+  --chrom chr21 --baseline atlas --combined-samples-track \
+  --min-participants-per-kmer 3
+```
+
+The combined track is named `All-samples`. Each sample is compared with its
+own tissue atlas before correctness changes are pooled, so tissues with more
+samples contribute proportionally more observations.
+
+Filters `--tissue`, `--participant`, `--chrom`, `--bin-group`, and `--baseline`
+may be repeated. Baseline choices are `pretrained` and `atlas`; by default all
+available baselines are included. The default views are `bin1`, `bin2`, `bin3`,
+`bin4`, `bin5`, `bins3-5`, and `bins4-5`. Bins 1 and 2 are standalone
+views and are not added to either combined-bin view. Generation refuses to
+overwrite a non-empty output directory.
+
+## Outputs
+
+- `tracks/*.correctness_delta.bedGraph`: mean correctness change at each k-mer.
+- `tracks/*.true_probability_delta.bedGraph`: mean true-class probability change.
+- `tracks/*.status.bed`: BED9 tissue records with compact `n#_r#_h#` names,
+  where `n` is contributing participants, `r` is rescued, and `h` is harmed.
+  The complete both-correct and both-wrong counts remain in the summary tables.
+- `participant_tracks/*.status.bed`: exact rescued/harmed/both-correct/both-wrong
+  records when `--participant-tracks` is requested.
+- `kmer_summary.tsv.gz`: complete tissue/k-mer audit before coverage filtering.
+- `browser_kmer_summary.tsv.gz`: the rows shown in tissue browser tracks after
+  applying `--min-participants-per-kmer`.
+- `participant_kmer_summary.tsv.gz`: participant rows when requested.
+- `qc_summary.tsv`: variability coverage.
+- `selected_manifest.tsv`: exact prediction paths and checkpoint selection.
+- `igv_session.xml` and `ucsc_custom_tracks.txt`: complete browser bundles.
+- `ucsc_categorical_tracks.txt`: categorical-only UCSC upload without numerical
+  bedGraphs. With `--participant-tracks`, it contains the exact participant
+  categories: green rescued, red harmed, blue both-correct, and gray both-wrong.
+  Otherwise it contains the tissue aggregate status BEDs.
+
+For large multi-tissue output, IGV and individual tracks are preferable to the
+self-contained UCSC text bundle. bigWig/bigBed conversion tools are not installed
+in the current environment, so this first implementation emits standard sorted
+BED and bedGraph files.
+
+## Real pilot
+
+The checked pilot at
+`scripts/results/methylation_kmer_tracks_Z0000044P_chr21` contains participant
+Z0000044P, Heart-Cardiomyocyte, chr21. It validates 54,509 paired k-mers and
+matches 51,838 (95.1%) to variability data. Open its `igv_session.xml` with
+hg38, or upload its `ucsc_custom_tracks.txt`.
+
+Coordinates inherit the source hg38 and 0-based convention used by the prediction
+windows. The 5.4 kb `window_id` is retained only for pairing and context, not as
+the reported result interval.
