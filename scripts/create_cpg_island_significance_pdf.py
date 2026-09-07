@@ -1,0 +1,358 @@
+#!/usr/bin/env python3
+# Create the PDF from the default CpG-island significance tables:
+#   python3 scripts/create_cpg_island_significance_pdf.py
+# Create the PDF from another result directory:
+#   python3 scripts/create_cpg_island_significance_pdf.py \
+#     --input-dir /path/to/significance/outputs \
+#     --output-file /path/to/report.pdf
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import textwrap
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
+import pandas as pd
+
+
+PROJECT = Path(__file__).resolve().parents[1]
+DEFAULT_INPUT = PROJECT / "cpg_island_filtered_significance_20260830/outputs"
+DEFAULT_OUTPUT = DEFAULT_INPUT / "cpg_island_filtered_personalization_significance_report.pdf"
+E10_COLOR = "#D62728"
+E3_COLOR = "#4C78A8"
+POSITIVE_COLOR = "#2E7D32"
+NEGATIVE_COLOR = "#B3261E"
+NEUTRAL_COLOR = "#5F6368"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create a multipage PDF for CpG-island personalization results."
+    )
+    parser.add_argument("--input-dir", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument("--output-file", type=Path, default=DEFAULT_OUTPUT)
+    return parser.parse_args()
+
+
+def load_results(input_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    people = pd.read_csv(input_dir / "participant_results.csv")
+    tissues = pd.read_csv(input_dir / "tissue_results.csv")
+    combined = pd.read_csv(input_dir / "combined_results.csv")
+    return people, tissues, combined
+
+
+def apply_style() -> None:
+    plt.rcParams.update(
+        {
+            "font.size": 10,
+            "axes.titlesize": 14,
+            "axes.labelsize": 11,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+        }
+    )
+
+
+def save_page(pdf: PdfPages, figure: plt.Figure) -> None:
+    figure.tight_layout()
+    pdf.savefig(figure)
+    plt.close(figure)
+
+
+def add_wrapped_text(
+    axis: plt.Axes, y: float, text: str, width: int = 105, size: int = 11
+) -> float:
+    wrapped = textwrap.fill(text, width=width)
+    axis.text(0.05, y, wrapped, transform=axis.transAxes, va="top", fontsize=size)
+    return y - 0.043 * (wrapped.count("\n") + 1) - 0.018
+
+
+def title_page(
+    pdf: PdfPages, people: pd.DataFrame, combined: pd.DataFrame
+) -> None:
+    figure, axis = plt.subplots(figsize=(11, 8.5))
+    axis.axis("off")
+    axis.text(
+        0.05,
+        0.94,
+        "CpG-island-filtered TEST personalization",
+        transform=axis.transAxes,
+        fontsize=22,
+        weight="bold",
+        va="top",
+    )
+    axis.text(
+        0.05,
+        0.88,
+        "Weighted-F1 significance report: personalized E3 versus pretrained/LODO E10",
+        transform=axis.transAxes,
+        fontsize=14,
+        color="#3C4043",
+        va="top",
+    )
+    equal_person = combined.loc[combined["weighting"].eq("equal_person")].iloc[0]
+    y = 0.79
+    summary = (
+        f"Dataset: {int(equal_person.tokens):,} paired six-base prediction tokens, "
+        f"{int(equal_person.participants)} participants, {int(equal_person.tissues)} tissue/cell-type strata, "
+        f"and {int(equal_person.person_windows):,} participant-window contributions."
+    )
+    y = add_wrapped_text(axis, y, summary, size=12)
+    y = add_wrapped_text(
+        axis,
+        y,
+        "The saved UCSC hg38 CpG-island-overlap dataset was used directly. Filtering was not repeated. "
+        "Rows were paired between E10 and E3 before this analysis.",
+    )
+    y = add_wrapped_text(
+        axis,
+        y,
+        "Participant analysis: complete paired E10/E3 confusion contributions were swapped at the window level "
+        "in 10,000 one-sided permutations. Confidence intervals used 5,000 paired window bootstraps. "
+        "Participant p-values were BH-adjusted across 31 tests.",
+    )
+    y = add_wrapped_text(
+        axis,
+        y,
+        "Combined analysis: participant-level F1 differences were label-swapped. The equal-tissue statistic gives "
+        "each tissue one sixth of the total weight; the equal-person statistic gives each participant 1/31 of the weight.",
+    )
+    y = add_wrapped_text(
+        axis,
+        y,
+        "Tissue analysis: all possible participant-level sign assignments were enumerated exactly within each tissue. "
+        "Tissue q-values correct six tests. Tissue inference remains low-powered with only 4-8 participants per stratum.",
+    )
+    y = add_wrapped_text(
+        axis,
+        y,
+        "All p-values are exploratory/nominal because this annotated subset and its observed direction were inspected "
+        "before this analysis. Window-level participant tests may also be optimistic when nearby windows are spatially dependent.",
+    )
+    add_wrapped_text(
+        axis,
+        y,
+        "CpG-island overlap defines an annotation subset only. It does not establish regulatory mechanism, function, "
+        "or individual-CpG behavior. This report tests E3 versus E10 within the subset; it is not the separate "
+        "CpG-island-minus-unfiltered interaction test.",
+    )
+    save_page(pdf, figure)
+
+
+def annotate_bars(axis: plt.Axes, bars) -> None:
+    for bar in bars:
+        height = bar.get_height()
+        axis.annotate(
+            f"{height:.4f}",
+            (bar.get_x() + bar.get_width() / 2, height),
+            xytext=(0, 5),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+
+def paired_f1_bars(
+    axis: plt.Axes, labels: list[str], e10: np.ndarray, e3: np.ndarray
+) -> None:
+    x = np.arange(len(labels))
+    width = 0.34
+    e10_bars = axis.bar(x - width / 2, e10, width, color=E10_COLOR, label="Pretrain/LODO E10")
+    e3_bars = axis.bar(x + width / 2, e3, width, color=E3_COLOR, label="Personalized E3")
+    annotate_bars(axis, e10_bars)
+    annotate_bars(axis, e3_bars)
+    axis.set_xticks(x, labels)
+    axis.set_ylabel("Weighted F1")
+    axis.grid(axis="y", alpha=0.25)
+    axis.legend(frameon=False)
+    minimum = min(float(e10.min()), float(e3.min()))
+    maximum = max(float(e10.max()), float(e3.max()))
+    padding = max((maximum - minimum) * 0.45, 0.012)
+    axis.set_ylim(max(0, minimum - padding), min(1.0, maximum + padding))
+
+
+def combined_page(pdf: PdfPages, combined: pd.DataFrame) -> None:
+    rows = combined.set_index("weighting").loc[["equal_tissue", "equal_person"]]
+    figure, axes = plt.subplots(2, 1, figsize=(11, 8.5), gridspec_kw={"height_ratios": [1.15, 1]})
+    labels = ["Equal tissue", "Equal person"]
+    paired_f1_bars(
+        axes[0], labels, rows["e10_weighted_f1"].to_numpy(), rows["e3_weighted_f1"].to_numpy()
+    )
+    axes[0].set_title("Combined CpG-island weighted F1", loc="left", weight="bold")
+    y = np.arange(len(rows))
+    delta = rows["delta_e3_minus_e10"].to_numpy()
+    lower = delta - rows["bootstrap_ci_low"].to_numpy()
+    upper = rows["bootstrap_ci_high"].to_numpy() - delta
+    axes[1].errorbar(
+        delta,
+        y,
+        xerr=np.vstack([lower, upper]),
+        fmt="o",
+        color=POSITIVE_COLOR,
+        ecolor=POSITIVE_COLOR,
+        capsize=5,
+        markersize=7,
+    )
+    axes[1].axvline(0, color="#202124", linestyle=":", linewidth=1.5)
+    axes[1].set_yticks(y, labels)
+    axes[1].set_xlabel("Weighted-F1 difference (E3 - E10)")
+    axes[1].set_title("Participant-bootstrap effect intervals", loc="left", weight="bold")
+    axes[1].grid(axis="x", alpha=0.25)
+    for index, result in enumerate(rows.itertuples()):
+        axes[1].annotate(
+            f"Delta={result.delta_e3_minus_e10:.4f}; nominal p={result.permutation_p_one_sided:.4g}; "
+            f"{result.improved_participants}/{result.participants} improved",
+            (result.bootstrap_ci_high, index),
+            xytext=(8, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=9,
+        )
+    figure.suptitle("Cohort summary", fontsize=17, weight="bold", y=0.99)
+    save_page(pdf, figure)
+
+
+def tissue_f1_page(pdf: PdfPages, tissues: pd.DataFrame) -> None:
+    rows = tissues.sort_values("tissue")
+    labels = [label.replace("-", "-\n") for label in rows["tissue"]]
+    figure, axis = plt.subplots(figsize=(11, 8.5))
+    paired_f1_bars(
+        axis, labels, rows["e10_weighted_f1"].to_numpy(), rows["e3_weighted_f1"].to_numpy()
+    )
+    axis.set_title("Equal-participant weighted F1 within tissue", loc="left", weight="bold")
+    axis.tick_params(axis="x", labelsize=9)
+    axis.text(
+        0,
+        -0.18,
+        "Each tissue bar is the mean of participant-level weighted F1 values; participants receive equal weight within tissue.",
+        transform=axis.transAxes,
+        fontsize=9,
+    )
+    save_page(pdf, figure)
+
+
+def tissue_effect_page(pdf: PdfPages, tissues: pd.DataFrame) -> None:
+    rows = tissues.sort_values("delta_e3_minus_e10")
+    y = np.arange(len(rows))
+    delta = rows["delta_e3_minus_e10"].to_numpy()
+    lower = delta - rows["bootstrap_ci_low"].to_numpy()
+    upper = rows["bootstrap_ci_high"].to_numpy() - delta
+    colors = np.where(delta >= 0, POSITIVE_COLOR, NEGATIVE_COLOR)
+    figure, axis = plt.subplots(figsize=(11, 8.5))
+    for index in range(len(rows)):
+        axis.errorbar(
+            delta[index],
+            y[index],
+            xerr=np.array([[lower[index]], [upper[index]]]),
+            fmt="o",
+            color=colors[index],
+            ecolor=colors[index],
+            capsize=5,
+            markersize=7,
+        )
+    axis.axvline(0, color="#202124", linestyle=":", linewidth=1.5)
+    axis.set_yticks(y, rows["tissue"])
+    axis.set_xlabel("Weighted-F1 difference (E3 - E10)")
+    axis.set_title("Tissue effects with participant-bootstrap 95% intervals", loc="left", weight="bold")
+    axis.grid(axis="x", alpha=0.25)
+    for index, result in enumerate(rows.itertuples(index=False)):
+        axis.annotate(
+            f"{result.improved_participants}/{result.participants} improved; "
+            f"nominal p={result.exact_permutation_p_one_sided:.4g}; q={result.permutation_q_bh_6_tests:.4g}",
+            (result.bootstrap_ci_high, index),
+            xytext=(8, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=9,
+        )
+    save_page(pdf, figure)
+
+
+def participant_color(result) -> str:
+    if result.significantly_improved:
+        return POSITIVE_COLOR
+    if result.delta_e3_minus_e10 < 0:
+        return NEGATIVE_COLOR
+    return NEUTRAL_COLOR
+
+
+def participant_page(pdf: PdfPages, tissue: str, rows: pd.DataFrame) -> None:
+    rows = rows.sort_values("delta_e3_minus_e10")
+    y = np.arange(len(rows))
+    figure, axis = plt.subplots(figsize=(11, 8.5))
+    for index, result in enumerate(rows.itertuples(index=False)):
+        color = participant_color(result)
+        lower = result.delta_e3_minus_e10 - result.bootstrap_ci_low
+        upper = result.bootstrap_ci_high - result.delta_e3_minus_e10
+        axis.errorbar(
+            result.delta_e3_minus_e10,
+            index,
+            xerr=np.array([[lower], [upper]]),
+            fmt="o",
+            color=color,
+            ecolor=color,
+            capsize=4,
+            markersize=7,
+        )
+        axis.annotate(
+            f"Delta={result.delta_e3_minus_e10:.4f}; {result.relative_improvement_percent:+.2f}%; "
+            f"p={result.permutation_p_one_sided:.4g}; q={result.permutation_q_bh_31_tests:.4g}",
+            (result.bootstrap_ci_high, index),
+            xytext=(8, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=9,
+        )
+    axis.axvline(0, color="#202124", linestyle=":", linewidth=1.5)
+    axis.set_yticks(y, rows["participant"])
+    axis.set_xlabel("Weighted-F1 difference (E3 - E10)")
+    significant = int(rows["significantly_improved"].sum())
+    improved = int(rows["direction"].eq("improved").sum())
+    axis.set_title(
+        f"{tissue}: participant effects\n{improved}/{len(rows)} improved; {significant}/{len(rows)} BH-significant improvements",
+        loc="left",
+        weight="bold",
+    )
+    axis.grid(axis="x", alpha=0.25)
+    axis.text(
+        0,
+        -0.12,
+        "Green: positive effect with BH q<0.05. Gray: positive but not BH-significant. Red: worsening. Intervals resample windows.",
+        transform=axis.transAxes,
+        fontsize=9,
+    )
+    save_page(pdf, figure)
+
+
+def write_pdf(
+    output_file: Path,
+    people: pd.DataFrame,
+    tissues: pd.DataFrame,
+    combined: pd.DataFrame,
+) -> None:
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with PdfPages(output_file) as pdf:
+        title_page(pdf, people, combined)
+        combined_page(pdf, combined)
+        tissue_f1_page(pdf, tissues)
+        tissue_effect_page(pdf, tissues)
+        for tissue, rows in people.groupby("tissue", sort=True):
+            participant_page(pdf, tissue, rows)
+
+
+def main() -> None:
+    args = parse_args()
+    apply_style()
+    people, tissues, combined = load_results(args.input_dir)
+    write_pdf(args.output_file, people, tissues, combined)
+    print(args.output_file.resolve())
+
+
+if __name__ == "__main__":
+    main()

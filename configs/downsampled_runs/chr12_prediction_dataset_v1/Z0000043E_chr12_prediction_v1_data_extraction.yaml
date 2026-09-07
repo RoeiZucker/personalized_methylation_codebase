@@ -1,0 +1,44 @@
+paths:
+  assemblies:
+    HG38: /sci/archive/michall/roeizucker/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  raw_data_path: /sci/labs/michall/roeizucker/roei_test/downloaded_datasets/GSM5652353_Breast-Basal-Epithelial-Z0000043E.hg38.bigwig
+  intermediate_train_data_path: /sci/labs/michall/roeizucker/roei_test/token_cls_datasets2_chr12_prediction_v1/_token_cls_Breast-Basal-Epithelial_kmer/Z0000043E_retrain_token_cls_Breast-Basal-Epithelial_kmer_seq_5400_chr12_prediction_v1_intermediate.csv
+  intermediate_test_data_path: /sci/labs/michall/roeizucker/roei_test/token_cls_datasets2_chr12_prediction_v1/_token_cls_Breast-Basal-Epithelial_kmer/Z0000043E_retrain_token_cls_Breast-Basal-Epithelial_kmer_seq_5400_chr12_prediction_v1_empty.csv
+  hf_dataset_test_path: /sci/labs/michall/roeizucker/roei_test/token_cls_datasets2_chr12_prediction_v1/_token_cls_Breast-Basal-Epithelial_kmer/Z0000043E_retrain_token_cls_Breast-Basal-Epithelial_kmer_seq_5400_datasets_test
+task:
+  type: cpg_token_classification_extraction
+  assembly: HG38
+  value_column: methyl_rate
+  input_mode: raw_input
+  seq_size: 5400
+  test_size: 0
+  blank_label: -100
+  use_fasta: true
+  shuffle: true
+  chromosomes:
+  - chr12
+  tokenizer_name: InstaDeepAI/nucleotide-transformer-2.5b-multi-species
+  output_preprocessed_data: false
+  output_intermediate_data: true
+  output_hf_dataset: true
+  window_type: standart_no_overlap
+  override_dataset: false
+  train_test_seperation: kmer_sample_filtration
+  clear_generator_cache: false
+  replace_min1: true
+  token_label_binning:
+    method: fixed
+    low: 0.2
+    high: 0.8
+  prediction_only: true
+  eval_size: 0
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+variant_filtering:
+  use_variant_filtering: false
+  variant_filtering_upper_bound: -1
+  variant_filtering_lower_bound: -1

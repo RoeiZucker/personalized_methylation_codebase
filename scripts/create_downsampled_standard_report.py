@@ -65,16 +65,17 @@ def infer_tissue(sample_results):
 
 
 def stage_from_path(path):
-    parent = Path(path).parent.name
-    if parent.startswith("pretrain"):
-        return "pretrain"
-    checkpoint = re.match(r"checkpoint-(\d+)", parent)
-    if checkpoint:
-        return "checkpoint-" + checkpoint.group(1)
-    epoch = re.match(r"epoch-(\d+)-step-", parent)
-    if epoch:
-        return "E" + epoch.group(1)
-    return parent
+    for parent in Path(path).parents:
+        name = parent.name
+        if name.startswith("pretrain"):
+            return "pretrain"
+        checkpoint = re.match(r"checkpoint-(\d+)", name)
+        if checkpoint:
+            return "checkpoint-" + checkpoint.group(1)
+        epoch = re.match(r"epoch-(\d+)-step-", name)
+        if epoch:
+            return "E" + epoch.group(1)
+    return Path(path).parent.name
 
 
 def stage_number(stage):

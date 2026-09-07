@@ -1,0 +1,515 @@
+#!/usr/bin/env python3
+# Build the complete filtered TEST report with four local workers:
+#   python3 scripts/create_cpg_island_standard_report.py --workers 4
+# Evaluate one participant and retain its reusable metric table:
+#   python3 scripts/create_cpg_island_standard_report.py --participant Z000000QM
+# Rebuild only the aggregate tables and PDF from completed participant tables:
+#   python3 scripts/create_cpg_island_standard_report.py --report-only
+
+from __future__ import annotations
+
+import argparse
+import ast
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+import re
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
+import pandas as pd
+
+
+PROJECT = Path(__file__).resolve().parents[1]
+DATASET = PROJECT / "cpg_island_filtered_dataset_20260830/outputs/cpg_island_filtered_tokens.csv.gz"
+STANDARD_ROOT = PROJECT / "scripts/results/downsampled_standard_ratio_0p25_lr_3e-05"
+OUTPUT = PROJECT / "cpg_island_filtered_standard_report_20260830/outputs"
+VARIABILITY_ROOT = Path(
+    "/sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir"
+)
+SECTIONS = ["all_results", "bin_1", "bin_2", "bin_3", "bin_4", "bin_5"]
+STAGES = ["E1", "E2", "E3"]
+LABELS = np.arange(3)
+
+
+@dataclass(frozen=True)
+class Task:
+    participant: str
+    tissue: str
+    e1_path: str
+    e2_path: str
+    mean_cache_path: str
+    variability_path: str
+
+
+@dataclass(frozen=True)
+class Settings:
+    dataset: str
+    output_dir: str
+    chunksize: int
+    force: bool
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create a standard-style TEST weighted-F1 report for saved CpG-island tokens."
+    )
+    parser.add_argument("--dataset", type=Path, default=DATASET)
+    parser.add_argument("--standard-root", type=Path, default=STANDARD_ROOT)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT)
+    parser.add_argument("--variability-root", type=Path, default=VARIABILITY_ROOT)
+    parser.add_argument("--participant")
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--chunksize", type=int, default=400_000)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--report-only", action="store_true")
+    return parser.parse_args()
+
+
+def read_eval(path: Path) -> dict:
+    return ast.literal_eval(path.read_text(encoding="utf-8"))
+
+
+def infer_tissue(paths: list[str]) -> str:
+    for path in paths:
+        match = re.search(r"_token_cls_(.+?)_kmer/", path)
+        if match:
+            return match.group(1)
+    raise ValueError("Could not infer tissue from prediction paths")
+
+
+def checkpoint_number(path: str) -> int:
+    match = re.search(r"checkpoint-(\d+)", path)
+    if match is None:
+        raise ValueError(f"Missing checkpoint number: {path}")
+    return int(match.group(1))
+
+
+def variability_path(root: Path, participant: str, tissue: str) -> Path:
+    return (
+        root
+        / f"_{tissue}_kmer"
+        / f"{participant}_per_varaint_variability_{tissue}_kmer_seq_5400_datasets.csv"
+    )
+
+
+def discover_tasks(args: argparse.Namespace) -> list[Task]:
+    tasks = []
+    for sample_dir in sorted(args.standard_root.iterdir()):
+        eval_path = sample_dir / "test_eval_objects_dict.txt"
+        cache_path = sample_dir / "mean_label_caches/test_eval_objects_dict_mean_label_cache.pkl"
+        if not eval_path.exists() or not cache_path.exists():
+            continue
+        participant = sample_dir.name
+        if args.participant and participant != args.participant:
+            continue
+        payload = read_eval(eval_path)
+        if participant not in payload:
+            continue
+        paths = list(payload[participant])
+        checkpoints = sorted(
+            [path for path in paths if "checkpoint-" in path], key=checkpoint_number
+        )
+        if len(checkpoints) != 3:
+            raise ValueError(f"{participant}: expected E1-E3 paths, found {len(checkpoints)}")
+        tissue = infer_tissue(paths)
+        var_path = variability_path(args.variability_root, participant, tissue)
+        required = [Path(checkpoints[0]), Path(checkpoints[1]), cache_path, var_path]
+        missing = [str(path) for path in required if not path.exists()]
+        if missing:
+            raise FileNotFoundError(f"{participant}: missing sources: {missing}")
+        tasks.append(
+            Task(
+                participant,
+                tissue,
+                checkpoints[0],
+                checkpoints[1],
+                str(cache_path),
+                str(var_path),
+            )
+        )
+    if not tasks:
+        raise ValueError("No matching participant tasks were discovered")
+    return tasks
+
+
+def participant_path(output_dir: Path, participant: str) -> Path:
+    return output_dir / "participant_metrics" / f"{participant}.csv"
+
+
+def coverage_path(output_dir: Path, participant: str) -> Path:
+    return output_dir / "participant_metrics" / f"{participant}_coverage.csv"
+
+
+def load_filtered_rows(dataset: str, participant: str, chunksize: int) -> pd.DataFrame:
+    columns = [
+        "participant",
+        "tissue",
+        "chrom",
+        "window_id",
+        "token_start",
+        "label",
+        "predicted_class_e10",
+        "predicted_class_e3",
+    ]
+    frames = []
+    for chunk in pd.read_csv(dataset, usecols=columns, chunksize=chunksize):
+        selected = chunk.loc[chunk["participant"].eq(participant)]
+        if not selected.empty:
+            frames.append(selected)
+    if not frames:
+        raise ValueError(f"{participant}: no rows in filtered dataset")
+    rows = pd.concat(frames, ignore_index=True)
+    rows["label"] = rows["label"].astype("int8")
+    rows["genomic_position"] = rows["token_start"].astype("int64")
+    rows["row_id"] = np.arange(len(rows), dtype=np.int64)
+    return rows
+
+
+def select_standard_rows(rows: pd.DataFrame, cache_path: str) -> pd.DataFrame:
+    cache = pd.read_pickle(cache_path)[
+        ["window_id", "genomic_position", "label", "chrom", "mean_label"]
+    ].copy()
+    cache["label"] = cache["label"].astype("int8")
+    cache = cache.rename(columns={"chrom": "cache_chrom"})
+    keys = ["window_id", "genomic_position", "label"]
+    selected = rows.merge(cache, on=keys, how="inner", validate="one_to_one")
+    if selected.empty:
+        raise ValueError("No filtered tokens matched the standard mean-label cache")
+    if not selected["chrom"].equals(selected["cache_chrom"]):
+        raise ValueError("Chromosome mismatch between filtered tokens and mean cache")
+    return selected.drop(columns=["cache_chrom"]).reset_index(drop=True)
+
+
+def candidate_positions(rows: pd.DataFrame) -> pd.DataFrame:
+    frames = []
+    for offset in range(-1, 6):
+        start = rows["genomic_position"] + offset
+        frames.append(
+            pd.DataFrame(
+                {
+                    "row_id": rows["row_id"].to_numpy(),
+                    "full_position": (
+                        rows["chrom"].astype(str)
+                        + ":"
+                        + start.astype(str)
+                        + "-"
+                        + (start + 2).astype(str)
+                    ),
+                }
+            )
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
+def attach_variability(rows: pd.DataFrame, path: str, chunksize: int) -> tuple[pd.DataFrame, float]:
+    candidates = candidate_positions(rows)
+    targets = set(candidates["full_position"])
+    matches = []
+    std_max = float("-inf")
+    for chunk in pd.read_csv(path, usecols=["full_position", "std"], chunksize=chunksize):
+        values = pd.to_numeric(chunk["std"], errors="coerce")
+        if values.notna().any():
+            std_max = max(std_max, float(values.max()))
+        selected = chunk.loc[chunk["full_position"].isin(targets), ["full_position", "std"]]
+        if not selected.empty:
+            matches.append(selected)
+    if not matches or not np.isfinite(std_max):
+        raise ValueError("No variability values matched filtered standard rows")
+    lookup = pd.concat(matches).groupby("full_position", as_index=False)["std"].mean()
+    mapped = candidates.merge(lookup, on="full_position", how="left")
+    means = mapped.groupby("row_id")["std"].mean()
+    output = rows.copy()
+    output["variability_std"] = output["row_id"].map(means)
+    if output["variability_std"].isna().any():
+        missing = int(output["variability_std"].isna().sum())
+        raise ValueError(f"{missing} standard-evaluable filtered rows lack variability")
+    edges = np.linspace(0, std_max, 6)
+    output["section_rank"] = pd.cut(
+        output["variability_std"],
+        bins=edges,
+        labels=[f"bin_{index}" for index in range(1, 6)],
+        include_lowest=True,
+        right=True,
+    )
+    if output["section_rank"].isna().any():
+        raise ValueError("Variability values fell outside participant-specific bin edges")
+    return output, std_max
+
+
+def extract_prediction(rows: pd.DataFrame, path: str, chunksize: int) -> pd.Series:
+    keys = ["window_id", "genomic_position", "label"]
+    targets = rows[["row_id", *keys]]
+    matches = []
+    for chunk in pd.read_csv(
+        path, usecols=[*keys, "predicted_class"], chunksize=chunksize
+    ):
+        chunk["label"] = chunk["label"].astype("int8")
+        selected = targets.merge(chunk, on=keys, how="inner")
+        if not selected.empty:
+            matches.append(selected[["row_id", "predicted_class"]])
+    if not matches:
+        raise ValueError(f"No predictions matched {path}")
+    predictions = pd.concat(matches, ignore_index=True)
+    if predictions["row_id"].duplicated().any() or len(predictions) != len(rows):
+        raise ValueError(f"Prediction pairing failed for {path}: {len(predictions)}/{len(rows)}")
+    return predictions.set_index("row_id")["predicted_class"].reindex(rows["row_id"]).astype("int8")
+
+
+def weighted_f1(labels: np.ndarray, predictions: np.ndarray) -> float:
+    matrix = np.bincount(3 * labels + predictions, minlength=9).reshape(3, 3)
+    support = matrix.sum(axis=1).astype(float)
+    predicted = matrix.sum(axis=0).astype(float)
+    true_positive = np.diag(matrix).astype(float)
+    precision = np.divide(true_positive, predicted, out=np.zeros(3), where=predicted > 0)
+    recall = np.divide(true_positive, support, out=np.zeros(3), where=support > 0)
+    class_f1 = np.divide(
+        2 * precision * recall,
+        precision + recall,
+        out=np.zeros(3),
+        where=(precision + recall) > 0,
+    )
+    return float(np.average(class_f1, weights=support))
+
+
+def metric_row(task: Task, rows: pd.DataFrame, section: str, stage: str, column: str) -> dict:
+    score = float("nan")
+    if not rows.empty:
+        labels = rows["label"].to_numpy(dtype=np.int64)
+        predictions = rows[column].to_numpy(dtype=np.int64)
+        score = weighted_f1(labels, predictions)
+    return {
+        "sample": task.participant,
+        "tissue": task.tissue,
+        "split": "test",
+        "stage": stage,
+        "prediction_type": "mean_label" if column == "mean_label" else "predicted_class",
+        "section_rank": section,
+        "support": len(rows),
+        "weighted_f1": score,
+    }
+
+
+def summarize_participant(task: Task, rows: pd.DataFrame) -> pd.DataFrame:
+    records = []
+    masks = {"all_results": np.ones(len(rows), dtype=bool)}
+    masks.update({section: rows["section_rank"].eq(section).to_numpy() for section in SECTIONS[1:]})
+    columns = {
+        "pretrain": "predicted_class_e10",
+        "E1": "predicted_class_e1",
+        "E2": "predicted_class_e2",
+        "E3": "predicted_class_e3",
+    }
+    for section, mask in masks.items():
+        subset = rows.loc[mask]
+        for stage, column in columns.items():
+            records.append(metric_row(task, subset, section, stage, column))
+        records.append(metric_row(task, subset, section, "pretrain", "mean_label"))
+    return pd.DataFrame(records)
+
+
+def evaluate_task(task: Task, settings: Settings) -> str:
+    output_dir = Path(settings.output_dir)
+    metric_file = participant_path(output_dir, task.participant)
+    if metric_file.exists() and not settings.force:
+        return f"reuse {task.participant}"
+    rows = load_filtered_rows(settings.dataset, task.participant, settings.chunksize)
+    filtered_count = len(rows)
+    selected = select_standard_rows(rows, task.mean_cache_path)
+    selected, std_max = attach_variability(selected, task.variability_path, settings.chunksize)
+    selected["predicted_class_e1"] = extract_prediction(
+        selected, task.e1_path, settings.chunksize
+    ).to_numpy()
+    selected["predicted_class_e2"] = extract_prediction(
+        selected, task.e2_path, settings.chunksize
+    ).to_numpy()
+    metrics = summarize_participant(task, selected)
+    metric_file.parent.mkdir(parents=True, exist_ok=True)
+    metrics.to_csv(metric_file, index=False)
+    pd.DataFrame(
+        [
+            {
+                "sample": task.participant,
+                "tissue": task.tissue,
+                "filtered_tokens": filtered_count,
+                "standard_evaluable_filtered_tokens": len(selected),
+                "coverage_fraction": len(selected) / filtered_count,
+                "variability_std_max": std_max,
+            }
+        ]
+    ).to_csv(coverage_path(output_dir, task.participant), index=False)
+    return f"complete {task.participant}: {len(selected):,}/{filtered_count:,} rows"
+
+
+def run_tasks(tasks: list[Task], settings: Settings, workers: int) -> None:
+    if workers == 1:
+        for task in tasks:
+            print(evaluate_task(task, settings), flush=True)
+        return
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(evaluate_task, task, settings): task for task in tasks}
+        for future in as_completed(futures):
+            print(future.result(), flush=True)
+
+
+def collect_outputs(output_dir: Path, tasks: list[Task]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    metric_files = [participant_path(output_dir, task.participant) for task in tasks]
+    coverage_files = [coverage_path(output_dir, task.participant) for task in tasks]
+    missing = [str(path) for path in metric_files + coverage_files if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"Missing participant outputs: {missing}")
+    metrics = pd.concat([pd.read_csv(path) for path in metric_files], ignore_index=True)
+    coverage = pd.concat([pd.read_csv(path) for path in coverage_files], ignore_index=True)
+    return metrics, coverage
+
+
+def aggregate(metrics: pd.DataFrame, groups: list[str]) -> pd.DataFrame:
+    grouped = metrics.groupby(groups, as_index=False)
+    means = grouped["weighted_f1"].mean()
+    stds = grouped["weighted_f1"].std(ddof=1).rename(columns={"weighted_f1": "weighted_f1_std"})
+    support = grouped["support"].mean().rename(columns={"support": "avg_support"})
+    return means.merge(stds, on=groups).merge(support, on=groups)
+
+
+def axis_limits(values: list[float]) -> tuple[float, float]:
+    finite = [value for value in values if np.isfinite(value)]
+    low = max(0, min(finite) - 0.07)
+    high = min(1.05, max(finite) + 0.09)
+    if high - low < 0.12:
+        middle = (low + high) / 2
+        return max(0, middle - 0.06), min(1.05, middle + 0.06)
+    return low, high
+
+
+def baseline(axis: plt.Axes, rows: pd.DataFrame, color: str, label: str, values: list[float], x: float) -> None:
+    if rows.empty:
+        return
+    value = float(rows["weighted_f1"].iloc[0])
+    std = float(rows["weighted_f1_std"].fillna(0).iloc[0])
+    values.extend([value, value - std, value + std])
+    axis.axhline(value, color=color, linestyle=":", linewidth=2.5, label=label)
+    if std > 0:
+        axis.errorbar([x], [value], yerr=[[std], [std]], fmt="o", color=color, capsize=4, markersize=3)
+    vertical = "bottom" if color == "black" else "top"
+    axis.text(0.99, value, f" {label.lower()} {value:.3f}", transform=axis.get_yaxis_transform(), ha="right", va=vertical, fontsize=7, color=color)
+
+
+def draw_section(axis: plt.Axes, rows: pd.DataFrame, section: str) -> None:
+    subset = rows.loc[rows["section_rank"].eq(section)]
+    retrain = subset.loc[
+        subset["prediction_type"].eq("predicted_class") & subset["stage"].isin(STAGES)
+    ].copy()
+    retrain["stage"] = pd.Categorical(retrain["stage"], STAGES, ordered=True)
+    retrain = retrain.sort_values("stage")
+    x = np.arange(3)
+    errors = retrain["weighted_f1_std"].fillna(0).to_numpy()
+    bars = axis.bar(
+        x,
+        retrain["weighted_f1"],
+        yerr=errors,
+        capsize=4,
+        color="#4C78A8",
+        ecolor="#222222",
+        width=0.55,
+        label="Retrain prediction",
+    )
+    values = list(retrain["weighted_f1"] - errors) + list(retrain["weighted_f1"] + errors)
+    for bar in bars:
+        axis.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.004, f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=7, rotation=90)
+    mean_rows = subset.loc[
+        subset["prediction_type"].eq("mean_label") & subset["stage"].eq("pretrain")
+    ]
+    pretrain_rows = subset.loc[
+        subset["prediction_type"].eq("predicted_class") & subset["stage"].eq("pretrain")
+    ]
+    baseline(axis, mean_rows, "black", "Mean label", values, 2.88)
+    baseline(axis, pretrain_rows, "#D62728", "Pretrain E10", values, 2.68)
+    name = "All sites" if section == "all_results" else "Bin " + section.split("_")[1]
+    support = float(retrain["avg_support"].mean())
+    axis.set_title(f"{name} | avg n={support:,.0f}", loc="left", fontsize=9)
+    axis.set_ylim(*axis_limits(values))
+    axis.set_ylabel("Weighted F1", fontsize=8)
+    axis.grid(axis="y", alpha=0.25)
+    axis.legend(loc="best", fontsize=7, frameon=False)
+
+
+def draw_result_page(pdf: PdfPages, rows: pd.DataFrame, title: str) -> None:
+    figure, axes = plt.subplots(6, 1, figsize=(11, 8.5), sharex=True)
+    for axis, section in zip(axes, SECTIONS):
+        draw_section(axis, rows, section)
+    axes[-1].set_xticks(np.arange(3), ["Retrain E1", "Retrain E2", "Retrain E3"])
+    figure.suptitle(f"{title}: Weighted F1\nBins grouped by participant-specific variability rank", y=0.995, fontsize=13)
+    figure.tight_layout(rect=[0, 0, 1, 0.96])
+    pdf.savefig(figure)
+    plt.close(figure)
+
+
+def draw_title_page(pdf: PdfPages, coverage: pd.DataFrame) -> None:
+    figure, axis = plt.subplots(figsize=(11, 8.5))
+    axis.axis("off")
+    lines = [
+        f"CpG-island-filtered ordinary TEST report ({len(coverage)} samples)",
+        "Standard variability-bin format",
+        "",
+        f"Saved island-overlap tokens: {int(coverage['filtered_tokens'].sum()):,}",
+        f"Standard-evaluable filtered tokens: {int(coverage['standard_evaluable_filtered_tokens'].sum()):,}",
+        f"Coverage: {coverage['standard_evaluable_filtered_tokens'].sum() / coverage['filtered_tokens'].sum():.2%}",
+        "",
+        "The saved filtered token keys were used directly; CpG-island filtering was not repeated.",
+        "E1 and E2 were matched to those keys. E10 and E3 came from the saved paired dataset.",
+        "Rows were then restricted to positions represented in the standard mean-label and",
+        "variability resources, matching the reference report pipeline.",
+        "Averages use equal participant weight. Whiskers show between-participant standard deviation.",
+        "Dotted black line: filtered mean-label baseline. Dotted red line: filtered pretrain-E10 baseline.",
+        "",
+        "Included samples:",
+        *[
+            f"  {row.sample}: {row.tissue} ({int(row.standard_evaluable_filtered_tokens):,}/{int(row.filtered_tokens):,})"
+            for row in coverage.sort_values(["tissue", "sample"]).itertuples(index=False)
+        ],
+    ]
+    axis.text(0.04, 0.97, "\n".join(lines), va="top", ha="left", fontsize=9.5)
+    pdf.savefig(figure)
+    plt.close(figure)
+
+
+def write_report(output_dir: Path, metrics: pd.DataFrame, coverage: pd.DataFrame) -> Path:
+    average = aggregate(metrics, ["split", "stage", "prediction_type", "section_rank"])
+    tissue = aggregate(
+        metrics, ["tissue", "split", "stage", "prediction_type", "section_rank"]
+    )
+    metrics.to_csv(output_dir / "cpg_island_filtered_test_metric_rows.csv", index=False)
+    coverage.to_csv(output_dir / "cpg_island_filtered_test_coverage.csv", index=False)
+    average.to_csv(output_dir / "cpg_island_filtered_test_average_metrics.csv", index=False)
+    tissue.to_csv(output_dir / "cpg_island_filtered_test_tissue_average_metrics.csv", index=False)
+    path = output_dir / "cpg_island_filtered_test_weighted_f1_average_and_tissue_report.pdf"
+    with PdfPages(path) as pdf:
+        draw_title_page(pdf, coverage)
+        draw_result_page(pdf, average, f"CpG-island filtered test average across {coverage['sample'].nunique()} samples")
+        for tissue_name in sorted(tissue["tissue"].unique()):
+            tissue_rows = tissue.loc[tissue["tissue"].eq(tissue_name)]
+            count = int(coverage["tissue"].eq(tissue_name).sum())
+            draw_result_page(pdf, tissue_rows, f"CpG-island filtered test {tissue_name} average across {count} samples")
+    return path
+
+
+def main() -> None:
+    args = parse_args()
+    if args.workers < 1 or args.chunksize < 1:
+        raise ValueError("--workers and --chunksize must be positive")
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    tasks = discover_tasks(args)
+    settings = Settings(str(args.dataset), str(args.output_dir), args.chunksize, args.force)
+    if not args.report_only:
+        run_tasks(tasks, settings, args.workers)
+    metrics, coverage = collect_outputs(args.output_dir, tasks)
+    report = write_report(args.output_dir, metrics, coverage)
+    print(report.resolve(), flush=True)
+
+
+if __name__ == "__main__":
+    main()

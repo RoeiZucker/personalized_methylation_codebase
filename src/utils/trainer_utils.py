@@ -44,6 +44,10 @@ def _softmax_np(values):
     return exp_values / exp_values.sum()
 
 class EpochCheckpointCallback(TrainerCallback):
+    def on_train_begin(self, args, state, control, **kwargs):
+        state.save_steps = args.save_steps
+        return control
+
     def on_epoch_end(self, args, state, control, **kwargs):
         model = kwargs["model"]  # provided by Trainer
         epoch_dir = os.path.join(args.output_dir, f"{SAVED_EPOCH_PREFIX}-{int(state.epoch)}-step-{state.global_step}")

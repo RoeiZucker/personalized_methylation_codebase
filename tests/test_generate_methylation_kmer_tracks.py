@@ -17,6 +17,7 @@ from scripts.generate_methylation_kmer_tracks import (
     load_kmer_predictions,
     run_participant_jobs,
     status_values,
+    validate_disjoint_input_windows,
 )
 
 
@@ -245,3 +246,22 @@ def test_status_categories_are_distinct():
     assert status_values(retrained, baseline).tolist() == [
         "rescued", "harmed", "both_correct", "both_wrong"
     ]
+
+
+def test_combined_inputs_must_have_disjoint_windows():
+    def input_frame(window_id):
+        return pd.DataFrame(
+            {
+                "participant": ["P1"],
+                "tissue": ["Heart-Cardiomyocyte"],
+                "window_id": [window_id],
+            }
+        )
+
+    validate_disjoint_input_windows(
+        [(input_frame("chr12:0-5400"), {}), (input_frame("chr12:5400-10800"), {})]
+    )
+    with pytest.raises(ValueError, match="Input splits overlap by 1 windows"):
+        validate_disjoint_input_windows(
+            [(input_frame("chr12:0-5400"), {}), (input_frame("chr12:0-5400"), {})]
+        )

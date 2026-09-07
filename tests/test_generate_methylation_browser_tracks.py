@@ -14,10 +14,12 @@ from scripts.generate_methylation_browser_tracks import (
     benjamini_hochberg,
     build_tracks,
     comparison_rows,
+    discover_manifest,
     discover_result_row,
     disjoint_segments,
     load_predictions,
     prepare_output_dir,
+    register_participant_windows,
     qc_row,
     rank_candidates,
     sign_flip_p,
@@ -183,6 +185,47 @@ def test_discovery_selects_largest_numeric_checkpoint(tmp_path):
     assert row["selected_checkpoint"] == 30
     assert "checkpoint-30" in str(row["retrained_path"])
     assert row["selection_rule"] == "largest_numeric_checkpoint"
+
+
+def test_combined_discovery_loads_eval_and_test_for_each_participant(tmp_path):
+    result_dir = tmp_path / "P1"
+    result_dir.mkdir()
+    for split in ("eval", "test"):
+        paths = {
+            f"/root/_token_cls_Liver-Hepatocytes_kmer/run/pretrain_epoch10/{split}_predictions.csv": {},
+            f"/root/_token_cls_Liver-Hepatocytes_kmer/run/checkpoint-30/{split}_predictions.csv": {},
+        }
+        (result_dir / f"{split}_eval_objects_dict.txt").write_text(
+            repr({"P1": paths})
+        )
+
+    variability_root = tmp_path / "chr12_variability"
+    manifest = discover_manifest(tmp_path, "combined", variability_root)
+
+    assert manifest["split"].tolist() == ["eval", "test"]
+    assert manifest["participant"].tolist() == ["P1", "P1"]
+    assert all(manifest["selected_checkpoint"] == 30)
+    assert manifest.iloc[0]["mean_path"].name.startswith("eval_")
+    assert manifest.iloc[1]["mean_path"].name.startswith("test_")
+    assert all(
+        str(path).startswith(str(variability_root))
+        for path in manifest["variability_path"]
+    )
+
+
+def test_combined_inputs_must_have_disjoint_windows():
+    seen = {}
+    metadata = pd.Series({"participant": "P1", "tissue": "T"})
+    register_participant_windows(
+        pd.DataFrame({"window_id": ["chr12:0-10"]}), metadata, seen
+    )
+    register_participant_windows(
+        pd.DataFrame({"window_id": ["chr12:10-20"]}), metadata, seen
+    )
+    with pytest.raises(ValueError, match="overlap"):
+        register_participant_windows(
+            pd.DataFrame({"window_id": ["chr12:0-10"]}), metadata, seen
+        )
 
 
 def test_exact_sign_flip_test_uses_participants_as_replicates():

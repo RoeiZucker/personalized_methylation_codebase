@@ -84,6 +84,34 @@ def _save_dataset(dataset, save_path, verbose):
     dataset.save_to_disk(save_path, num_proc=1)
 
 
+def _create_prediction_only_hf_dataset(task, paths, tokenizer, verbose):
+    dataset = _load_token_dataset(
+        task,
+        paths["intermediate_train_data_path"],
+        task.get("kmer_size", INSTADEEP_KMER_SIZE),
+        task["seq_size"],
+    )
+    resolved_binning = resolve_token_label_binning(task, dataset)
+    dataset = apply_token_label_binning_to_dataset(dataset, resolved_binning)
+    encoded_dataset = _tokenize_dataset(dataset, tokenizer)
+    _save_dataset(encoded_dataset, paths["hf_dataset_test_path"], verbose)
+    return resolved_binning
+
+
+def _dataset_output_path(task, paths):
+    if task.get("prediction_only", False):
+        return paths["hf_dataset_test_path"]
+    return paths["hf_dataset_train_path"]
+
+
+def _create_output_directories(task, paths):
+    if not task.get("prediction_only", False):
+        return
+    for key in ("intermediate_train_data_path", "intermediate_test_data_path"):
+        os.makedirs(os.path.dirname(paths[key]), exist_ok=True)
+    os.makedirs(os.path.dirname(paths["hf_dataset_test_path"]), exist_ok=True)
+
+
 def _has_eval_dataset(eval_size):
     return eval_size is not None and eval_size > 0
 
@@ -258,10 +286,15 @@ def encode_cpg_token_classification_extraction(cfg):
     test_size = task.get("test_size", 0.2)
     eval_size = task.get("eval_size", 0)
     train_only = test_size == 0
+    prediction_only = task.get("prediction_only", False)
+    output_path = _dataset_output_path(task, paths)
 
-    if os.path.exists(paths["hf_dataset_train_path"]) and not task.get("override_dataset", False):
-        raise ValueError("HF dataset exists and override is False or not supplied" + paths["hf_dataset_train_path"])
+    if os.path.exists(output_path) and not task.get("override_dataset", False):
+        raise ValueError(
+            "HF dataset exists and override is False or not supplied" + output_path
+        )
 
+    _create_output_directories(task, paths)
     _maybe_create_intermediate_data(cfg)
     if not task["output_hf_dataset"]:
         return
@@ -270,20 +303,28 @@ def encode_cpg_token_classification_extraction(cfg):
         print("Creating token-classification Hugging Face dataset from intermediate data.", flush=True)
 
     tokenizer = AutoTokenizer.from_pretrained(task["tokenizer_name"])
-    resolved_binning = _create_token_classification_hf_datasets(
-        task=task,
-        paths=paths,
-        tokenizer=tokenizer,
-        train_test_seperation_type=task.get("train_test_seperation", None),
-        blank_label=task["blank_label"],
-        test_size=test_size,
-        eval_size=eval_size,
-        random_state=cfg.get("random_state", 42),
-        kmer_size=task.get("kmer_size", INSTADEEP_KMER_SIZE),
-        seq_size=task["seq_size"],
-        train_only=train_only,
-        verbose=verbose,
-    )
+    if prediction_only:
+        resolved_binning = _create_prediction_only_hf_dataset(
+            task,
+            paths,
+            tokenizer,
+            verbose,
+        )
+    else:
+        resolved_binning = _create_token_classification_hf_datasets(
+            task=task,
+            paths=paths,
+            tokenizer=tokenizer,
+            train_test_seperation_type=task.get("train_test_seperation", None),
+            blank_label=task["blank_label"],
+            test_size=test_size,
+            eval_size=eval_size,
+            random_state=cfg.get("random_state", 42),
+            kmer_size=task.get("kmer_size", INSTADEEP_KMER_SIZE),
+            seq_size=task["seq_size"],
+            train_only=train_only,
+            verbose=verbose,
+        )
     if verbose:
         print(
             "resolved token label binning:",

@@ -15,6 +15,12 @@ Examples:
   python3 scripts/generate_methylation_browser_tracks.py \
     --manifest analysis/track_manifest_no_mean.tsv --output-dir analysis/browser_tracks
 
+  # Combine disjoint standardized eval and test windows with chr12 variability:
+  python3 scripts/generate_methylation_browser_tracks.py \
+    --results-root scripts/results/chr12_results --split combined \
+    --variability-root /path/to/chr12_variability --chrom chr12 \
+    --output-dir scripts/results/chr12_tracks_combined
+
   # Treat predictions as continuous values and compare absolute error:
   python3 scripts/generate_methylation_browser_tracks.py \
     --manifest analysis/track_manifest.tsv --output-dir analysis/browser_tracks_mae \
@@ -50,6 +56,10 @@ REQUIRED_MANIFEST_COLUMNS = {
 KEY_COLUMNS = ["window_id", "genomic_position"]
 EXACT_BIN_GROUPS = {f"bin{i}": {i} for i in range(1, 6)}
 COMBINED_BIN_GROUPS = {"bins3-5": {3, 4, 5}, "bins4-5": {4, 5}, "all": {1, 2, 3, 4, 5}}
+DEFAULT_VARIABILITY_ROOT = Path(
+    "/sci/labs/michall/roeizucker/huggingface_datasets_dir/"
+    "huggingface_datasets_dir"
+)
 BED_COLUMNS = [
     "chrom",
     "start",
@@ -81,13 +91,17 @@ def parse_args() -> argparse.Namespace:
     source.add_argument("--manifest", type=Path)
     source.add_argument("--results-root", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--split", choices=("eval", "test"), default="test")
+    parser.add_argument("--split", choices=("eval", "test", "combined"), default="test")
     parser.add_argument("--tissue", action="append", dest="tissues")
     parser.add_argument("--participant", action="append", dest="participants")
     parser.add_argument("--chrom", action="append", dest="chroms")
     parser.add_argument("--bin-group", action="append", dest="bin_groups")
     parser.add_argument("--metric", choices=("accuracy", "mae"), default="accuracy")
     parser.add_argument("--prediction-column", default="predicted_class")
+    parser.add_argument(
+        "--variability-root", type=Path, default=DEFAULT_VARIABILITY_ROOT,
+        help="Root containing participant variability CSVs grouped by tissue",
+    )
     parser.add_argument("--genome", default="hg38", help="IGV genome identifier")
     parser.add_argument("--min-variability-match-rate", type=float, default=0.5)
     parser.add_argument(
@@ -127,8 +141,11 @@ def load_manifest(path: Path) -> pd.DataFrame:
         raise ValueError(f"Manifest is missing columns: {sorted(missing)}")
     if manifest.empty:
         raise ValueError("Manifest has no participant rows")
-    if manifest.duplicated(["participant", "tissue"]).any():
-        raise ValueError("Manifest participant/tissue pairs must be unique")
+    identity_columns = ["participant", "tissue"]
+    if "split" in manifest:
+        identity_columns.append("split")
+    if manifest.duplicated(identity_columns).any():
+        raise ValueError(f"Manifest rows must be unique by {identity_columns}")
     base_dir = path.resolve().parent
     for column in ("retrained_path", "pretrained_path", "variability_path", "mean_path"):
         if column in manifest:
@@ -148,13 +165,20 @@ def tissue_from_path(path: str) -> str:
     return match.group("tissue")
 
 
-def variability_path(participant: str, tissue: str) -> Path:
-    root = Path("/sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir")
+def variability_path(
+    participant: str,
+    tissue: str,
+    root: Path = DEFAULT_VARIABILITY_ROOT,
+) -> Path:
     name = f"{participant}_per_varaint_variability_{tissue}_kmer_seq_5400_datasets.csv"
     return root / f"_{tissue}_kmer" / name
 
 
-def discover_result_row(eval_path: Path, split: str) -> dict[str, object]:
+def discover_result_row(
+    eval_path: Path,
+    split: str,
+    variability_root: Path = DEFAULT_VARIABILITY_ROOT,
+) -> dict[str, object]:
     payload = ast.literal_eval(eval_path.read_text(encoding="utf-8"))
     if len(payload) != 1:
         raise ValueError(f"Expected one participant in {eval_path}")
@@ -174,7 +198,7 @@ def discover_result_row(eval_path: Path, split: str) -> dict[str, object]:
         "tissue": tissue,
         "retrained_path": Path(retrained),
         "pretrained_path": Path(pretrain[0]),
-        "variability_path": variability_path(participant, tissue),
+        "variability_path": variability_path(participant, tissue, variability_root),
         "mean_path": mean_path,
         "split": split,
         "selected_checkpoint": selected_checkpoint,
@@ -182,11 +206,40 @@ def discover_result_row(eval_path: Path, split: str) -> dict[str, object]:
     }
 
 
-def discover_manifest(results_root: Path, split: str) -> pd.DataFrame:
+def discover_split_manifest(
+    results_root: Path,
+    split: str,
+    variability_root: Path = DEFAULT_VARIABILITY_ROOT,
+) -> pd.DataFrame:
     paths = sorted(results_root.glob(f"*/{split}_eval_objects_dict.txt"))
     if not paths:
         raise FileNotFoundError(f"No {split} evaluation dictionaries under {results_root}")
-    return pd.DataFrame(discover_result_row(path, split) for path in paths)
+    return pd.DataFrame(
+        discover_result_row(path, split, variability_root) for path in paths
+    )
+
+
+def discover_manifest(
+    results_root: Path,
+    split: str,
+    variability_root: Path = DEFAULT_VARIABILITY_ROOT,
+) -> pd.DataFrame:
+    if split != "combined":
+        return discover_split_manifest(results_root, split, variability_root)
+    manifest = pd.concat(
+        [
+            discover_split_manifest(results_root, "eval", variability_root),
+            discover_split_manifest(results_root, "test", variability_root),
+        ],
+        ignore_index=True,
+    )
+    counts = manifest.groupby(["participant", "tissue"])["split"].nunique()
+    incomplete = counts[counts != 2]
+    if not incomplete.empty:
+        raise ValueError(
+            "Combined tracks require both eval and test dictionaries for every participant"
+        )
+    return manifest
 
 
 def filter_manifest(
@@ -456,6 +509,7 @@ def qc_row(frame: pd.DataFrame, metadata: pd.Series, minimum_rate: float) -> dic
     return {
         "participant": metadata["participant"],
         "tissue": metadata["tissue"],
+        "split": metadata.get("split", "unspecified"),
         "input_retrained_sites": site_count,
         "input_pretrained_sites": site_count,
         "input_model_windows": count_windows(frame),
@@ -1036,6 +1090,22 @@ def prepare_output_dir(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
+def register_participant_windows(
+    frame: pd.DataFrame,
+    metadata: pd.Series,
+    seen: dict[tuple[str, str], set[str]],
+) -> None:
+    identity = (str(metadata["participant"]), str(metadata["tissue"]))
+    window_ids = set(frame["window_id"].astype(str).unique())
+    overlap = seen.setdefault(identity, set()).intersection(window_ids)
+    if overlap:
+        raise ValueError(
+            f"Input splits overlap by {len(overlap)} windows for "
+            f"{metadata['participant']} ({metadata['tissue']})"
+        )
+    seen[identity].update(window_ids)
+
+
 def build_tracks(
     manifest: pd.DataFrame,
     output_dir: Path,
@@ -1054,8 +1124,10 @@ def build_tracks(
     prepare_output_dir(output_dir)
     participant_window_frames = []
     qc_rows = []
+    seen_windows: dict[tuple[str, str], set[str]] = {}
     for _, row in manifest.iterrows():
         paired = filter_chromosomes(pair_predictions(row, prediction_column), chroms)
+        register_participant_windows(paired, row, seen_windows)
         variable = add_variability(paired, row["variability_path"], None)
         qc_rows.append(qc_row(variable, row, minimum_match_rate))
         matched = variable.dropna(subset=["variability_bin"])
@@ -1086,7 +1158,9 @@ def main() -> None:
     if args.manifest:
         manifest = load_manifest(args.manifest)
     else:
-        manifest = discover_manifest(args.results_root, args.split)
+        manifest = discover_manifest(
+            args.results_root, args.split, args.variability_root
+        )
     manifest = filter_manifest(manifest, args.tissues, args.participants)
     build_tracks(
         manifest, args.output_dir, args.metric, args.prediction_column,

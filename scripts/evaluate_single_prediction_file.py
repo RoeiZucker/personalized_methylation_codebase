@@ -5,6 +5,12 @@
 #     /sci/labs/michall/roeizucker/roei_test/token_cls_models_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z00000431_epoch-10-step-849850_downsampled_ratio_0p25_retrain_token_cls_Liver-Hepatocytes_kmer_lr_3e-05_bs_14_seq_5400/checkpoint-29740/eval_predictions.csv.gitbackup \
 #     /sci/labs/michall/roeizucker/roei_test/token_cls_models_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z00000431_epoch-10-step-849850_downsampled_ratio_0p25_retrain_token_cls_Liver-Hepatocytes_kmer_lr_3e-05_bs_14_seq_5400/checkpoint-44610/eval_predictions.csv.gitbackup \
 #     scripts/results/downsampled_ratio_0p25_lr_3e-05_Z00000431_eval_variability_bins/eval_eval_objects_dict.txt
+# Example chr12 run:
+#   python3 scripts/evaluate_single_prediction_file.py --chroms chr12 \
+#     --comparison-dicts-root /sci/labs/michall/roeizucker/comparison_dicts_chr12_standardized_v1 \
+#     --variability-root /sci/labs/michall/roeizucker/huggingface_datasets_dir/huggingface_datasets_dir_chr12_standardized_split_v1 \
+#     /sci/labs/michall/roeizucker/roei_test/token_cls_models_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z00000431_epoch-10-step-849850_downsampled_ratio_0p25_retrain_token_cls_Liver-Hepatocytes_kmer_lr_3e-05_bs_14_seq_5400/pretrain_epoch10/chr12_standardized_split_v1/eval_predictions.csv.gitbackup \
+#     scripts/results/downsampled_standard_ratio_0p25_lr_3e-05_chr12_standardized_split_v1/Z00000431/eval_eval_objects_dict.txt
 
 from argparse import ArgumentParser
 import ast
@@ -38,8 +44,32 @@ def parse_args():
             "variability bins. The last positional argument is the destination file."
         )
     )
+    parser.add_argument(
+        "--chroms",
+        default=",".join(CHROMS),
+        help="Comma-separated chromosomes to evaluate, e.g. chr12.",
+    )
+    parser.add_argument(
+        "--comparison-dicts-root",
+        type=Path,
+        default=COMPARISON_DICTS_ROOT,
+        help="Root containing <tissue>/<sample>_comparison_dicts.pkl.",
+    )
+    parser.add_argument(
+        "--variability-root",
+        type=Path,
+        default=HF_DATASETS_ROOT,
+        help="Root containing _<tissue>_kmer/<sample>_per_varaint_variability_*.csv.",
+    )
     parser.add_argument("paths", nargs="+", type=Path)
     return parser.parse_args()
+
+
+def parse_chroms(chroms_text):
+    chroms = [chrom.strip() for chrom in chroms_text.split(",") if chrom.strip()]
+    if not chroms:
+        raise ValueError("--chroms must include at least one chromosome")
+    return chroms
 
 
 def split_input_paths(paths):
@@ -50,12 +80,20 @@ def split_input_paths(paths):
 
 def infer_sample_name(prediction_file):
     for parent in prediction_file.parents:
-        if parent.name.startswith("checkpoint-") or parent.name.startswith("pretrain_"):
+        if should_skip_sample_parent(parent.name):
             continue
         match = re.match(r"^(?P<sample>[^_]+)_", parent.name)
         if match is not None:
             return match.group("sample")
     raise ValueError(f"Could not infer sample name from {prediction_file}")
+
+
+def should_skip_sample_parent(name):
+    return (
+        name.startswith("checkpoint-")
+        or name.startswith("pretrain_")
+        or name.endswith("_split_v1")
+    )
 
 
 def infer_tissue_name(prediction_file):
@@ -69,8 +107,8 @@ def infer_tissue_name(prediction_file):
     raise ValueError(f"Could not infer tissue name from {prediction_file}")
 
 
-def load_comparison_dicts(sample_name, tissue_name):
-    path = COMPARISON_DICTS_ROOT / tissue_name / f"{sample_name}_comparison_dicts.pkl"
+def load_comparison_dicts(sample_name, tissue_name, comparison_dicts_root):
+    path = comparison_dicts_root / tissue_name / f"{sample_name}_comparison_dicts.pkl"
     if not path.exists():
         raise FileNotFoundError(f"Missing comparison dict file: {path}")
     with path.open("rb") as handle:
@@ -80,9 +118,9 @@ def load_comparison_dicts(sample_name, tissue_name):
     return payload
 
 
-def variability_file_path(sample_name, tissue_name):
+def variability_file_path(sample_name, tissue_name, variability_root):
     return (
-        HF_DATASETS_ROOT
+        variability_root
         / f"_{tissue_name}_kmer"
         / f"{sample_name}_per_varaint_variability_{tissue_name}_kmer_seq_5400_datasets.csv"
     )
@@ -113,8 +151,12 @@ def main():
         if infer_tissue_name(prediction_file) != tissue_name:
             raise ValueError("All prediction files must belong to the same tissue")
 
-    comparison_dicts = load_comparison_dicts(sample_name, tissue_name)
-    variability_file = variability_file_path(sample_name, tissue_name)
+    comparison_dicts = load_comparison_dicts(
+        sample_name,
+        tissue_name,
+        args.comparison_dicts_root,
+    )
+    variability_file = variability_file_path(sample_name, tissue_name, args.variability_root)
     if not variability_file.exists():
         raise FileNotFoundError(f"Missing variability file: {variability_file}")
 
@@ -124,7 +166,7 @@ def main():
     result = evaluate_sample_predictions(
         variability_file_path=str(variability_file),
         result_files_path=[str(prediction_file) for prediction_file in prediction_files],
-        chroms=CHROMS,
+        chroms=parse_chroms(args.chroms),
         comparison_bigwig_files=None,
         full_pos_name="full_pos",
         ranges=RANGES,

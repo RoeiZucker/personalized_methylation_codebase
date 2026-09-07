@@ -1,3 +1,12 @@
+"""Run prediction for one checkpoint against one configured dataset.
+
+Example, predict an eval split:
+python3 scripts/run_pretrain_checkpoint_prediction.py --config configs/downsampled_runs/prediction_standardized_v1/SAMPLE_downsampled_ratio_0p25_lr_3e-05_standardized_split_v1_predict_eval.yaml --checkpoint-path /path/to/checkpoint --output-path /path/to/eval_predictions.csv.gitbackup
+
+Example, predict a test split and replace an existing versioned output:
+python3 scripts/run_pretrain_checkpoint_prediction.py --config configs/downsampled_runs/prediction_standardized_v1/SAMPLE_downsampled_ratio_0p25_lr_3e-05_standardized_split_v1_predict_test.yaml --checkpoint-path /path/to/checkpoint --output-path /path/to/test_predictions.csv.gitbackup --overwrite
+"""
+
 import argparse
 import os
 import sys
@@ -34,12 +43,16 @@ def _load_yaml(path):
         return yaml.safe_load(handle) or {}
 
 
+def _prediction_settings(cfg):
+    return cfg.get("prediction", cfg.get("train", {}))
+
+
 def _load_prediction_dataset(cfg):
     paths = cfg["paths"]
     model_type = cfg["model"]["model_type"]
-    train_config = cfg["train"]
+    prediction_config = _prediction_settings(cfg)
     top_rows = cfg.get("task", {}).get("top_rows", -1)
-    load_dataset_to_memory = train_config.get("load_dataset_to_memory", False)
+    load_dataset_to_memory = prediction_config.get("load_dataset_to_memory", False)
     label_transform = get_task_label_transform(cfg["task"])
 
     eval_dataset_path = paths.get("eval_dataset_path")
@@ -59,7 +72,7 @@ def _load_prediction_dataset(cfg):
 
 def _create_prediction_trainer(cfg, checkpoint_path, prediction_dataset, output_dir):
     model_config = cfg["model"]
-    train_config = cfg["train"]
+    prediction_config = _prediction_settings(cfg)
     base_model_name = model_config["model_repo"] + "/" + model_config["model_name"]
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
@@ -73,18 +86,18 @@ def _create_prediction_trainer(cfg, checkpoint_path, prediction_dataset, output_
     )
 
     return get_trainer(
-        dataset=prediction_dataset,
+        dataset=None,
         model=model,
         tokenizer=tokenizer,
         model_type=model_config["model_type"],
         output_dir=output_dir,
         eval_mode=True,
         num_train_epochs=1,
-        per_device_train_batch_size=train_config.get("per_device_train_batch_size", 1),
-        per_device_eval_batch_size=train_config.get("per_device_eval_batch_size", 1),
-        learning_rate=float(train_config.get("learning_rate", 1e-6)),
+        per_device_train_batch_size=1,
+        per_device_eval_batch_size=prediction_config.get("per_device_eval_batch_size", 1),
+        learning_rate=1e-6,
         load_best_model_at_end=False,
-        metric_for_best_model=train_config.get("metric_for_best_model"),
+        metric_for_best_model=None,
         add_epoch_end_save_callback=False,
         add_epoch_end_prediction=False,
         eval_dataset=prediction_dataset,

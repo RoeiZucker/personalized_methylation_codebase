@@ -1,0 +1,50 @@
+paths:
+  assemblies:
+    HG38: /home/users/roeizucker/tests/reference_genome/hg38.fa
+    MM10: /sci/archive/michall/roeizucker/reference_genome/mm10.fa
+  generetor_cache_dir: /sci/archive/michall/roeizucker/huggingface_modles_cache/datasets/generator
+  train_dataset_path:
+  - /shared/cycle1_huji_linial_prj/roei_test/downsampled_datasets_all/_token_cls_Liver-Hepatocytes_kmer/Z0000044M_retrain_token_cls_Liver-Hepatocytes_kmer_seq_5400_datasets_train_ratio_0p25
+  output_dir: /shared/cycle1_huji_linial_prj/roei_test/token_cls_models_downsampled/_token_cls_Liver-Hepatocytes_kmer/Z0000044M_epoch-10-step-849900_downsampled_ratio_0p25_retrain_token_cls_Liver-Hepatocytes_kmer_lr_3e-05_bs_14_seq_5400
+  eval_dataset_path: null
+  trained_model_path: /shared/cycle1_huji_linial_prj/roei_test/token_cls_models2/_token_cls_Liver-Hepatocytes_kmer/Z0000044M_pretrain_token_cls_Liver-Hepatocytes_kmer_lr_1e-06_bs_14_seq_5400/epoch-10-step-849900
+  test_dataset_path: null
+task:
+  task_type: cpg_retraining
+  analysis_name: Z0000044M_epoch-10-step-849900_downsampled_ratio_0p25_retrain_token_cls_Liver-Hepatocytes_kmer_lr_3e-05_bs_14_seq_5400
+  top_rows: -1
+  label_transform: none
+testing_params:
+  test_mode: false
+random_state: 42
+verbose: true
+model:
+  model_name: nucleotide-transformer-2.5b-multi-species
+  model_repo: InstaDeepAI
+  model_type: classification_analysis
+  blank_label: -100
+  use_lora: false
+  freeze_model: false
+  num_labels: 3
+  lora_over_finetuned: false
+train:
+  load_best_model_at_end: false
+  num_train_epochs: 4
+  per_device_train_batch_size: 14
+  per_device_eval_batch_size: 14
+  learning_rate: 3.0e-05
+  metric_for_best_model: mcc
+  save_stratagy: epoch
+  lora_over_finetuned: false
+  load_dataset_to_memory: true
+  min_number_of_cpg_sites: 10
+  max_grad_norm: 1
+  number_of_steps: -1
+  save_total_limit: 4
+  add_epoch_end_save_callback: false
+  add_epoch_end_prediction: false
+  save_at_end: false
+  continue_from_last: true
+  eval_steps: -1
+wandb:
+  enabled: false

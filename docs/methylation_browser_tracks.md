@@ -21,6 +21,22 @@ python3 scripts/generate_methylation_browser_tracks.py \
   --max-regions-per-track 1000
 ```
 
+To analyze disjoint standardized eval and test windows together, use
+`--split combined`. Discovery loads both dictionaries for every participant,
+requires both splits, and refuses overlapping window IDs:
+
+```bash
+python3 scripts/generate_methylation_browser_tracks.py \
+  --results-root scripts/results/downsampled_standard_ratio_0p25_lr_3e-05_chr12_standardized_split_v1 \
+  --split combined --chrom chr12 \
+  --variability-root /path/to/chr12_variability \
+  --output-dir scripts/results/methylation_browser_tracks_chr12_combined
+```
+
+Use `--variability-root` whenever predictions target chromosomes absent from
+the legacy variability directory. The root must contain tissue subdirectories
+such as `_Liver-Hepatocytes_kmer` and participant variability CSVs.
+
 For a focused, repeatable run, filters may be repeated:
 
 ```bash

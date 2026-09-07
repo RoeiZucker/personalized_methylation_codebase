@@ -49,6 +49,22 @@ Examples:
     --baseline pretrained --combined-samples-track \
     --min-participants-per-kmer 3 --workers 4 --ucsc-item-details
 
+  # Combined standardized chr12 eval+test tracks versus atlas:
+  python3 scripts/generate_methylation_kmer_tracks.py \
+    --results-root scripts/results/chr12_standardized_results \
+    --split combined --variability-root /path/to/chr12_variability \
+    --chrom chr12 --output-dir analysis/chr12_combined_vs_atlas \
+    --baseline atlas --combined-samples-track \
+    --min-participants-per-kmer 3 --workers 4 --ucsc-item-details
+
+  # Combined standardized chr12 eval+test tracks versus pretrained:
+  python3 scripts/generate_methylation_kmer_tracks.py \
+    --results-root scripts/results/chr12_standardized_results \
+    --split combined --variability-root /path/to/chr12_variability \
+    --chrom chr12 --output-dir analysis/chr12_combined_vs_pretrained \
+    --baseline pretrained --combined-samples-track \
+    --min-participants-per-kmer 3 --workers 4 --ucsc-item-details
+
   # Explicit manifest and selected variability views:
   python3 scripts/generate_methylation_kmer_tracks.py \
     --manifest analysis/track_manifest.tsv --output-dir analysis/kmer_tracks \
@@ -70,6 +86,7 @@ import pandas as pd
 
 try:
     from generate_methylation_browser_tracks import (
+        DEFAULT_VARIABILITY_ROOT,
         add_variability,
         add_window_coordinates,
         chromosome_key,
@@ -84,6 +101,7 @@ try:
     )
 except ModuleNotFoundError:
     from scripts.generate_methylation_browser_tracks import (
+        DEFAULT_VARIABILITY_ROOT,
         add_variability,
         add_window_coordinates,
         chromosome_key,
@@ -122,7 +140,9 @@ def parse_args() -> argparse.Namespace:
     source.add_argument("--manifest", type=Path)
     source.add_argument("--results-root", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--split", choices=("eval", "test"), default="test")
+    parser.add_argument(
+        "--split", choices=("eval", "test", "combined"), default="test"
+    )
     parser.add_argument("--tissue", action="append", dest="tissues")
     parser.add_argument("--participant", action="append", dest="participants")
     parser.add_argument("--chrom", action="append", dest="chroms")
@@ -134,6 +154,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kmer-size", type=int, default=6)
     parser.add_argument("--min-participants-per-kmer", type=int, default=1)
     parser.add_argument("--min-variability-match-rate", type=float, default=0.5)
+    parser.add_argument(
+        "--variability-root", type=Path, default=DEFAULT_VARIABILITY_ROOT,
+        help="Root containing participant variability CSVs grouped by tissue",
+    )
     parser.add_argument("--participant-tracks", action="store_true")
     parser.add_argument("--combined-samples-track", action="store_true")
     parser.add_argument(
@@ -348,6 +372,7 @@ def participant_qc(
         )
     return {
         "participant": row["participant"], "tissue": row["tissue"],
+        "split": row.get("split", "unspecified"),
         "paired_kmers": len(frame),
         "matched_variability_kmers": int(matched.sum()),
         "unmatched_variability_kmers": int((~matched).sum()),
@@ -696,6 +721,21 @@ def run_participant_jobs(manifest: pd.DataFrame, worker, workers: int):
     return ordered_results
 
 
+def validate_disjoint_input_windows(results) -> None:
+    seen: dict[tuple[str, str], set[str]] = {}
+    for frame, _ in results:
+        identities = frame.groupby(["participant", "tissue"], observed=True)
+        for identity, group in identities:
+            window_ids = set(group["window_id"].astype(str).unique())
+            overlap = seen.setdefault(identity, set()).intersection(window_ids)
+            if overlap:
+                raise ValueError(
+                    f"Input splits overlap by {len(overlap)} windows for "
+                    f"{identity[0]} ({identity[1]})"
+                )
+            seen[identity].update(window_ids)
+
+
 def build_tracks(
     manifest: pd.DataFrame,
     output_dir: Path,
@@ -732,6 +772,7 @@ def build_tracks(
         baselines=baselines,
     )
     results = run_participant_jobs(manifest, worker, workers)
+    validate_disjoint_input_windows(results)
     report_progress("Expanding variability-bin views")
     frames = [expand_bin_groups(sites, groups) for sites, _ in results]
     qc_rows = [qc for _, qc in results]
@@ -797,7 +838,7 @@ def selected_manifest(args: argparse.Namespace) -> pd.DataFrame:
     manifest = (
         load_manifest(args.manifest)
         if args.manifest
-        else discover_manifest(args.results_root, args.split)
+        else discover_manifest(args.results_root, args.split, args.variability_root)
     )
     return filter_manifest(manifest, args.tissues, args.participants)
 
