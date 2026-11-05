@@ -1,0 +1,25 @@
+{
+  "coordinates": "Zero-based half-open. genomic_position starts a six-base token.",
+  "classes": {"0": "methylation <= 0.2", "1": "0.2 < methylation < 0.8", "2": "methylation >= 0.8", "-100": "masked"},
+  "prediction_rows": ["donor", "tissue", "chrom", "window_id", "genomic_position", "label", "predicted_class"],
+  "paired_rows": ["donor", "tissue", "chrom", "window_id", "genomic_position", "label", "bin", "donor_excluded", "personalized", "atlas", "local_class_average"],
+  "frozen_bins": ["donor", "window_id", "genomic_position", "bin"],
+  "track_csv": ["chrom", "start", "end", "methyl_rate"],
+  "reference_cpgs": ["chrom", "start", "end", "mean", "sd"],
+  "training_sites": ["donor", "chrom", "genomic_position", "label"],
+  "bimodal_regions": ["donor", "tissue", "chrom", "start", "end"],
+  "donor_matching_rows": ["donor", "model_donor", "stage", "bin", "window_id", "genomic_position", "label", "predicted_class"],
+  "chromosome_scores": ["donor", "tissue", "chrom", "bin", "gain"],
+  "optional_annotation_columns": "annotation_NAME as boolean or 0/1; bimodal_support counts distinct reference donors",
+  "annotation_sources": {
+    "cpg_island": "UCSC cpgIslandExt hg38",
+    "promoter": "GENCODE v50 GRCh38.p14; strand-specific TSS minus 2 kb to plus 500 bp",
+    "gene_body": "GENCODE v50 GRCh38.p14; whole genes",
+    "ccre_pls": "ENCODE SCREEN Registry v4 promoter-like cCREs",
+    "ccre_pels": "ENCODE SCREEN Registry v4 proximal enhancer-like cCREs",
+    "ccre_dels": "ENCODE SCREEN Registry v4 distal enhancer-like cCREs",
+    "regulatory_union": "Promoters and all SCREEN cCRE classes",
+    "bimodal": "Rosenski et al. 2025, DOI 10.1038/s41467-025-57433-1, Supplementary Data 1; retain hg19 catalog boundaries"
+  },
+  "mapping": "Both token endpoints map uniquely to the same chromosome and strand, with mapped span <= 20 bp. Failed mappings count as outside. Exclude target-donor support."
+}

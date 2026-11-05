@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personalized-methylation"
+version = "1.0.0"
+description = "Donor-specific DNA methylation prediction and evaluation"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["numpy>=1.26,<2", "pandas>=2.2,<3", "scipy>=1.13,<2", "matplotlib>=3.9,<4", "pyarrow>=17"]
+
+[project.optional-dependencies]
+model = ["torch==2.5.1", "transformers==4.41.0", "datasets==3.0.0", "accelerate==1.2.0", "biopython>=1.83", "pyBigWig==0.3.24; sys_platform != 'win32'"]
+mapping = ["pyliftover==0.4.1"]
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+methylation = "methylation.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
